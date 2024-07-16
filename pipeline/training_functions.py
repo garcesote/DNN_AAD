@@ -24,8 +24,6 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-
-
 def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path, max_epoch = 200, early_stopping_patience = 10):
     
     n_subjects = 18 if dataset=='Fulsang' else 13
@@ -150,21 +148,17 @@ def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50
         
         if dataset == 'Fulsang':
             train_set = FulsangDataset(data_path, 'train', subject)
-            train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
-            # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
             val_set = FulsangDataset(data_path, 'val', subject)
-            val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
-            # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)), pin_memory=True)
         else:
             train_set = HugoMapped(range(9), data_path, participant=n)
-            train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
-            # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
             val_set = HugoMapped(range(9, 12), data_path, participant=n)
-            val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
-            # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)),pin_memory=True)
         
-        train_eeg, train_stim = train_set.eeg, train_set.stima if dataset == 'Fulsang' else train_set.eeg, train_set.stim
-        val_eeg, val_stim = val_set.eeg, val_set.stima if dataset == 'Fulsang' else val_set.eeg, val_set.stim
+        if dataset == 'Fulsang':
+            train_eeg, train_stim = train_set.eeg, train_set.stima 
+            val_eeg, val_stim = val_set.eeg, val_set.stima 
+        else:
+            train_eeg, train_stim = train_set.eeg, train_set.stim
+            val_eeg, val_stim = val_set.eeg, val_set.stim
         
         # TRAIN MODEL
         mdl.fit(train_eeg.T, train_stim[:, np.newaxis])
@@ -177,6 +171,4 @@ def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50
         # SAVE THE MODEL
         subj = get_subject(n, n_subjects)
         save_path = mdl_save_path + '/ridge/ridge_'+subj+'_'+date+'_'+dataset
-        if not os.path.exists(save_path):
-            os.makedirs(save_path)
         pickle.dump(mdl, open(save_path, "wb"))

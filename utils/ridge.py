@@ -4,7 +4,7 @@ from collections.abc import Iterable
 import numpy as np
 
 class Ridge:
-    def __init__(self, start_lag=0, end_lag=50, alpha=1, verbose=True):
+    def __init__(self, start_lag=0, end_lag=50, alpha=1, verbose=True, original =False):
         '''
         num_lags: how many latencies to consider for the system response
         offset: when does the system response begin wrt an impulse timestamp? (may be negative)
@@ -13,6 +13,7 @@ class Ridge:
         self.start_lag=start_lag
         self.end_lag = end_lag
         self.num_lags = self.end_lag-self.start_lag
+        self.original = original
         if self.end_lag>0 and self.start_lag<0:
             self.num_lags+=1
 
@@ -27,7 +28,7 @@ class Ridge:
         self.verbose = verbose
 
         
-    def fit(self, X, y, original = False):
+    def fit(self, X, y):
         '''
         inputs:
         - X, ndarray of shape (n_times, n_input_features)
@@ -84,7 +85,7 @@ class Ridge:
             for j in range(self.n_output_features):
 
                 XtY = np.dot(lagged_matrix.T, y[:, j])
-                if not original:
+                if not self.original:
                     z = np.dot(V.T, XtY)
                     tmp_coefs = V @ np.diag(1/(S+alpha)) @ z[:, np.newaxis]
                 else:

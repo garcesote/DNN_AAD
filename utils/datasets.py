@@ -4,13 +4,14 @@ from utils.functional import get_trials, normalize
 import torch
 import numpy as np
 import h5py
+import os
 
 
 class FulsangDataset(Dataset):
 
-    def __init__(self, folder_path, split, subject, window = 50):
+    def __init__(self, folder_path, split, subject, window = 50, mode='corr'):
 
-        data_path = folder_path + subject + '_data_preproc.mat'
+        data_path = os.path.join(folder_path ,subject + '_data_preproc.mat')
         preproc_data = scipy.io.loadmat(data_path)
 
         trials = get_trials(split)
@@ -35,17 +36,27 @@ class FulsangDataset(Dataset):
         self.channels = eeg_data[0].shape[1]
         self.window = window
         self.subject = subject
+        self.mode = mode
 
     def __getitem__(self,idx):
         rest = self.window - (self.samples * self.trials - idx)
-        # Si se coge la ventana entera sin llegar al final
-        if rest < 0:
-            return self.eeg[:, idx:idx+self.window], self.stima[idx]
-        # Si llega al final, añadirle las muestras que faltan
-        else:
-            window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
-            return window, self.stima[idx], self.stimb[idx]
 
+        if self.mode == 'acc':
+            # Si se coge la ventana entera sin llegar al final
+            if rest < 0:
+                return self.eeg[:, idx:idx+self.window], self.stima[idx], self.stimb[idx]
+            # Si llega al final, añadirle las muestras que faltan
+            else:
+                window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
+                return window, self.stima[idx], self.stimb[idx]
+        else:
+            # Si se coge la ventana entera sin llegar al final
+            if rest < 0:
+                return self.eeg[:, idx:idx+self.window], self.stima[idx]
+            # Si llega al final, añadirle las muestras que faltan
+            else:
+                window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
+                return window, self.stima[idx]
     def __len__(self):
         return self.samples * self.trials
     
