@@ -26,9 +26,9 @@ else:
 
 def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path, max_epoch = 200, early_stopping_patience = 10):
     
-    n_subjects = 18 if dataset=='Fulsang' else 13
-    n_chan = 64 if dataset=='Fulsang' else 63
-    batch_size = 125 if dataset=='Fulsang' else 256
+    n_subjects = 18 if dataset=='fulsang' else 13
+    n_chan = 64 if dataset=='fulsang' else 63
+    batch_size = 125 if dataset=='fulsang' else 256
 
     for n in range(n_subjects):
 
@@ -47,7 +47,7 @@ def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path,
 
         mdl.to(device)
 
-        if dataset == 'Fulsang':
+        if dataset == 'fulsang':
             train_set = FulsangDataset(data_path, 'train', subject)
             train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
             # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
@@ -113,31 +113,37 @@ def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path,
             val_loss.append(mean_accuracy)
 
             # Save best results
-            if mean_accuracy > best_accuracy:
+            if mean_accuracy > best_accuracy or epoch == 0:
                 best_accuracy = mean_accuracy
                 best_epoch = epoch
                 best_state_dict = mdl.state_dict()
 
-        if dataset == 'Fulsang':
-            folder = 'fulsang_64Hz_data'
-        else:
-            folder = 'hugo_data'
 
         # save best final model
+        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model+'_'+date)
+        if not os.path.exists(mdl_folder):
+            os.makedirs(mdl_folder)
         torch.save(
             best_state_dict, 
-            os.path.join(mdl_save_path, folder, model+'_'+date+'_'+subject+f'_epoch={epoch}_acc={mean_accuracy:.4f}.ckpt')
+            os.path.join(mdl_folder, subject+'_'+f'_epoch={epoch}_acc={mean_accuracy:.4f}.ckpt')
         )
 
         # save corresponding metrics
-        json.dump(train_loss, open(os.path.join(metrics_save_path, folder, model+'_'+date+'_'+subject+'_train_loss'),'w'))
-        json.dump(val_loss, open(os.path.join(metrics_save_path, folder, model+'_'+date+'_'+subject+'_val_loss'),'w'))
+        val_folder = os.path.join(metrics_save_path, dataset + '_data', 'val', model+'_'+date)
+        if not os.path.exists(val_folder):
+            os.makedirs(val_folder)
+        # save corresponding metrics
+        train_folder = os.path.join(metrics_save_path, dataset + '_data', 'train', model+'_'+date)
+        if not os.path.exists(train_folder):
+            os.makedirs(train_folder)
+        json.dump(train_loss, open(os.path.join(train_folder, subject+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
+        json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
 
 def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50, original=False):
 
     # FOR ALL SUBJECTS
-    n_subjects = 18 if dataset == 'Fulsang' else 13
-    batch_size = 128 if dataset == 'Fulsang' else 256
+    n_subjects = 18 if dataset == 'fulsang' else 13
+    batch_size = 128 if dataset == 'fulsang' else 256
     alphas = np.logspace(-7,7, 15)
 
     for n in range(n_subjects):
@@ -146,14 +152,14 @@ def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50
         
         mdl = Ridge(start_lag=start_lag, end_lag=end_lag, alpha=alphas, original=original)
         
-        if dataset == 'Fulsang':
+        if dataset == 'fulsang':
             train_set = FulsangDataset(data_path, 'train', subject)
             val_set = FulsangDataset(data_path, 'val', subject)
         else:
             train_set = HugoMapped(range(9), data_path, participant=n)
             val_set = HugoMapped(range(9, 12), data_path, participant=n)
         
-        if dataset == 'Fulsang':
+        if dataset == 'fulsang':
             train_eeg, train_stim = train_set.eeg, train_set.stima 
             val_eeg, val_stim = val_set.eeg, val_set.stima 
         else:
@@ -169,6 +175,10 @@ def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50
         print(f'Model for subject {n} trained with a score of {scores[best_alpha]} with alpha = {best_alpha}')
 
         # SAVE THE MODEL
+        # save best final model
+        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', 'Ridge_'+date)
+        if not os.path.exists(mdl_folder):
+            os.makedirs(mdl_folder)
         subj = get_subject(n, n_subjects)
-        save_path = mdl_save_path + '/ridge/ridge_'+subj+'_'+date+'_'+dataset
+        save_path = os.path.join(mdl_folder, subj+f'_alpha={best_alpha}_acc={scores[best_alpha]:.4f}')
         pickle.dump(mdl, open(save_path, "wb"))

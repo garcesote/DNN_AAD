@@ -14,61 +14,58 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path):
+def get_filname(mdl_folder_path, subject):
+    list_dir = os.listdir(mdl_folder_path)
+    filename = ''
+    for file in list_dir:
+        if subject in file:
+            if subject == 'S1':
+                idx = file.index(subject)
+                if file[idx+2] == '_': # si el siguiente caracter al S1 es un barra baja añade al diccionario
+                    filename = file
+            else:
+                filename = file
+    return filename
+
+def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, date):
+
+    print('Evaluating '+model+' on '+dataset+' dataset')
 
     # FOR ALL SUBJECTS
-    n_subjects = 18 if dataset=='Fulsang' else 13
-    n_chan = 64 if dataset=='Fulsang' else 63
-    batch_size = 125 if dataset=='Fulsang' else 256
+    n_subjects = 18 if dataset=='fulsang' else 13
+    n_chan = 64 if dataset=='fulsang' else 63
+    batch_size = 125 if dataset=='fulsang' else 256
 
     eval_results = {}
-    mode = model
-
-    def get_filename(subj, file):
-        filename = ''
-        
-        if subj == 'S1':
-            idx = file.index(subj)
-            if file[idx+2] == '_': # si el siguiente caracter al S1 es un barra baja añade al diccionario
-                filename = file
-        else:
-            filename = file
-
-        return filename
 
     for n in range(n_subjects):
 
         subj = get_subject(n, n_subjects)
         
         # LOAD DATA
-        if dataset == 'Fulsang':
+        if dataset == 'fulsang':
             test_set = FulsangDataset(data_path, 'test', subj)
             test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)
         else:
             test_set = HugoMapped(range(12,15), data_path, participant=n)
             test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)
 
-        # LOAD MODEL
-        filename = dataset.lower() + '_64Hz' if dataset == 'Fulsang' else dataset
-        folder_path = os.path.join(mdl_path , dataset.lower() + '_data/')
-        list_dir = os.listdir(folder_path)
-        filename = ''
-        for file in list_dir:
-            if mode == 'CNN':
-                if subj in file and 'FCNN' not in file:
-                    filename = get_filename(subj, file)
-            else:
-                if subj in file and 'FCNN' in file:
-                    filename = get_filename(subj, file)
-        model_path = folder_path + filename
-        print(subj)
-        print(model_path)
-        if mode=='CNN':
+        # OBTAIN MODEL PATH
+        filename = dataset
+        folder_path = os.path.join(mdl_path , dataset + '_data', model+'_'+date)
+        filename = get_filname(folder_path, subj)
+    
+        model_path = os.path.join(folder_path, filename)
+
+        # LOAD THE MODEL
+        if model=='CNN':
             mdl = CNN(F1=8, D=8, F2=64, dropout=0.2, input_channels=n_chan)
         else:
             mdl = FCNN(n_hidden = 3, dropout_rate=0.45, n_chan=n_chan)
+
         mdl.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
         mdl.to(device)
+
         # EVALUATE THE MODEL
         accuracies = []
         with torch.no_grad():
@@ -82,29 +79,29 @@ def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path):
                 accuracies.append(acc.item())
 
         eval_results[subj] = accuracies
-        print(f'Subject {subj} | acc_mean{mean(accuracies)}')
+        print(f'Subject {subj} | acc_mean {mean(accuracies)}')
 
-    if dataset == 'Fulsang':
-        dest_path = dst_save_path + '/fulsang_64Hz_data'
-    else:
-        dest_path = dst_save_path + '/hugo_data'
+    # SAVE RESULTS
+    dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = model+'_Results'
+    filename = model+'_'+date+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
+
 
 def eval_ridge(dataset, data_path, mdl_path, date, dst_save_path):
 
-    n_subjects = 18 if dataset=='Fulsang' else 13
-    batch_size = 125 if dataset=='Fulsang' else 256
+    n_subjects = 18 if dataset=='fulsang' else 13
+    batch_size = 125 if dataset=='fulsang' else 256
     eval_results = {}
 
     for n in range(n_subjects):
 
         # CARGA EL MODELO
         subj = get_subject(n, n_subjects)
-        model_path = mdl_path + '/ridge/ridgeOriginal_'+subj+'_'+date+'_'+dataset
-        mdl = pickle.load(open(model_path, 'rb'))
+        mdl_folder_path = os.path.join(mdl_path, dataset + '_data', 'Ridge_'+date)
+        filename = get_filname(mdl_folder_path, subj)
+        mdl = pickle.load(open(filename, 'rb'))
 
         # CARGA EL TEST_SET
         test_dataset = HugoMapped(range(12, 15), data_path, participant=n)
@@ -116,8 +113,8 @@ def eval_ridge(dataset, data_path, mdl_path, date, dst_save_path):
 
         print(f'Sujeto {n} | accuracy: {np.mean(scores, axis=0)}')
 
-    dest_path = dst_save_path + '/hugo_data' if dataset == 'hugo' else dst_save_path + '/fulsang_64Hz_data'
+    dest_path = dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = 'Ridge_Results'
+    filename = 'Ridge_'+date+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
