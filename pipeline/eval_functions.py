@@ -1,6 +1,6 @@
 import torch
 import os
-from utils.datasets import HugoMapped, FulsangDataset
+from utils.datasets import HugoMapped, FulsangDataset, JaulabDataset
 from utils.dnn import CNN, FCNN
 from torch.utils.data import DataLoader
 from utils.functional import correlation, get_subject
@@ -27,32 +27,44 @@ def get_filname(mdl_folder_path, subject):
                 filename = file
     return filename
 
-def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, date):
+subj_jaulab_60electr = ['S13','S16']
+
+def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
     # FOR ALL SUBJECTS
-    n_subjects = 18 if dataset=='fulsang' else 13
-    n_chan = 64 if dataset=='fulsang' else 63
-    batch_size = 125 if dataset=='fulsang' else 256
+    data_subj = {'fulsang': 18, 'jaulab': 17, 'hugo': 13}
+    n_subjects = data_subj[dataset]
+    n_channels = {'fulsang': 64, 'jaulab': 61, 'hugo': 63}
+    n_chan = n_channels[dataset]
+    batch_sizes = {'fulsang': 128, 'jaulab': 128, 'hugo': 256} # training with windows of 2s
+    batch_size = batch_sizes[dataset]
 
     eval_results = {}
 
     for n in range(n_subjects):
 
         subj = get_subject(n, n_subjects)
-        
+        if dataset=='jaulab' and subj in subj_jaulab_60electr :
+            n_chan = 60
+        elif dataset=='jaulab':
+            n_chan = 61
+
         # LOAD DATA
         if dataset == 'fulsang':
             test_set = FulsangDataset(data_path, 'test', subj)
             test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)
+        if dataset == 'jaulab':
+            test_set = JaulabDataset(data_path, 'test', subj)
+            test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)        
         else:
             test_set = HugoMapped(range(12,15), data_path, participant=n)
             test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)
 
         # OBTAIN MODEL PATH
         filename = dataset
-        folder_path = os.path.join(mdl_path , dataset + '_data', model+'_'+date)
+        folder_path = os.path.join(mdl_path , dataset + '_data', model+'_'+key)
         filename = get_filname(folder_path, subj)
     
         model_path = os.path.join(folder_path, filename)
@@ -85,21 +97,21 @@ def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, date):
     dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = model+'_'+date+'_Results'
+    filename = model+'_'+key+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
 
 
-def eval_ridge(dataset, data_path, mdl_path, date, dst_save_path):
+def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path):
 
-    n_subjects = 18 if dataset=='fulsang' else 13
-    batch_size = 125 if dataset=='fulsang' else 256
+    n_subjects = 18 if dataset=='fulsang' or dataset == 'jaulab' else 13
+    batch_size = 125 if dataset=='fulsang' or dataset == 'jaulab' else 256
     eval_results = {}
 
     for n in range(n_subjects):
 
         # CARGA EL MODELO
         subj = get_subject(n, n_subjects)
-        mdl_folder_path = os.path.join(mdl_path, dataset + '_data', 'Ridge_'+date)
+        mdl_folder_path = os.path.join(mdl_path, dataset + '_data', 'Ridge_'+key)
         filename = get_filname(mdl_folder_path, subj)
         mdl = pickle.load(open(filename, 'rb'))
 
@@ -116,5 +128,5 @@ def eval_ridge(dataset, data_path, mdl_path, date, dst_save_path):
     dest_path = dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = 'Ridge_'+date+'_Results'
+    filename = 'Ridge_'+key+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))

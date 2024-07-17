@@ -14,7 +14,8 @@ class FulsangDataset(Dataset):
         data_path = os.path.join(folder_path ,subject + '_data_preproc.mat')
         preproc_data = scipy.io.loadmat(data_path)
 
-        trials = get_trials(split)
+        n_trials = 60
+        trials = get_trials(split, n_trials)
 
         # Array con n trials y dentro las muestras de audio y eeg
         eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
@@ -99,8 +100,61 @@ class HugoMapped(Dataset):
         self.stim = np.hstack(stim)
 
     def __getitem__(self, idx):
-
         return self.eeg[:, idx:idx+self.num_input], self.stim[idx]
     
     def __len__(self):
         return self.stim.size - self.num_input
+    
+class JaulabDataset(Dataset):
+
+    def __init__(self, folder_path, split, subject, window = 50, mode='corr'):
+
+        data_path = os.path.join(folder_path ,subject + '_preproc.mat')
+        preproc_data = scipy.io.loadmat(data_path)
+
+        n_trials = 96
+        trials = get_trials(split, n_trials)
+
+        # Array con n trials y dentro las muestras de audio y eeg
+        eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
+        stima_data = preproc_data['data']['wavA'][0,0][0,trials]
+        stimb_data = preproc_data['data']['wavB'][0,0][0,trials]
+        len_trial = len(trials)
+
+        # si hay mas canales de la cuenta selecciono los 64 primeros
+        if eeg_data[0].shape[1] > 64:
+            eeg_data = [trial[:,:64] for trial in eeg_data]
+
+        # Concatenar en un tensor todas las muestras (muestras * trials, canales) => (T * N, C).T => (C, T * N)
+        self.eeg = torch.hstack([normalize(torch.tensor(eeg_data[trial]).T) for trial in range(len_trial)])
+        self.stima = torch.squeeze(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)]))
+        self.stimb = torch.squeeze(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)]))
+
+        self.trials = len_trial
+        self.samples = eeg_data[0].shape[0]
+        self.channels = eeg_data[0].shape[1]
+        self.window = window
+        self.subject = subject
+        self.mode = mode
+
+    def __getitem__(self,idx):
+        rest = self.window - (self.samples * self.trials - idx)
+
+        if self.mode == 'acc':
+            # Si se coge la ventana entera sin llegar al final
+            if rest < 0:
+                return self.eeg[:, idx:idx+self.window], self.stima[idx], self.stimb[idx]
+            # Si llega al final, añadirle las muestras que faltan
+            else:
+                window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
+                return window, self.stima[idx], self.stimb[idx]
+        else:
+            # Si se coge la ventana entera sin llegar al final
+            if rest < 0:
+                return self.eeg[:, idx:idx+self.window], self.stima[idx]
+            # Si llega al final, añadirle las muestras que faltan
+            else:
+                window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
+                return window, self.stima[idx]
+    def __len__(self):
+        return self.samples * self.trials

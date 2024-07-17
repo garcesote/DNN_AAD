@@ -1,7 +1,7 @@
 import torch
 import os
 from utils.functional import get_subject, get_trials, normalize, correlation
-from utils.datasets import FulsangDataset, HugoMapped
+from utils.datasets import FulsangDataset, HugoMapped, JaulabDataset
 from utils.dnn import FCNN, CNN
 from utils.ridge import Ridge
 from torch.utils.data import Dataset, DataLoader
@@ -24,15 +24,24 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path, max_epoch = 200, early_stopping_patience = 10):
+subj_jaulab_60electr = ['S13','S16']
+
+def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, max_epoch = 200, early_stopping_patience = 10):
     
-    n_subjects = 18 if dataset=='fulsang' else 13
-    n_chan = 64 if dataset=='fulsang' else 63
-    batch_size = 125 if dataset=='fulsang' else 256
+    data_subj = {'fulsang': 18, 'jaulab': 17, 'hugo': 13}
+    n_subjects = data_subj[dataset]
+    n_channels = {'fulsang': 64, 'jaulab': 61, 'hugo': 63}
+    n_chan = n_channels[dataset]
+    batch_sizes = {'fulsang': 128, 'jaulab': 128, 'hugo': 256} # training with windows of 2s
+    batch_size = batch_sizes[dataset]
 
     for n in range(n_subjects):
-
+        
         subject = get_subject(n, n_subjects)
+        if dataset=='jaulab' and subject in subj_jaulab_60electr :
+            n_chan = 60
+        elif dataset=='jaulab':
+            n_chan = 61
 
         print(f'Training {model} with {dataset} data on {subject}...')
 
@@ -52,6 +61,13 @@ def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path,
             train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
             # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
             val_set = FulsangDataset(data_path, 'val', subject)
+            val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
+            # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)), pin_memory=True)
+        elif dataset == 'jaulab':
+            train_set = JaulabDataset(data_path, 'train', subject)
+            train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
+            # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
+            val_set = JaulabDataset(data_path, 'val', subject)
             val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
             # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)), pin_memory=True)
         else:
@@ -120,7 +136,7 @@ def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path,
 
 
         # save best final model
-        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model+'_'+date)
+        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model+'_'+key)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)
         torch.save(
@@ -129,21 +145,20 @@ def train_dnn(model, dataset, data_path, metrics_save_path, date, mdl_save_path,
         )
 
         # save corresponding metrics
-        val_folder = os.path.join(metrics_save_path, dataset + '_data', 'val', model+'_'+date)
+        val_folder = os.path.join(metrics_save_path, dataset + '_data', 'val', model+'_'+key)
         if not os.path.exists(val_folder):
             os.makedirs(val_folder)
         # save corresponding metrics
-        train_folder = os.path.join(metrics_save_path, dataset + '_data', 'train', model+'_'+date)
+        train_folder = os.path.join(metrics_save_path, dataset + '_data', 'train', model+'_'+key)
         if not os.path.exists(train_folder):
             os.makedirs(train_folder)
         json.dump(train_loss, open(os.path.join(train_folder, subject+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
         json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
 
-def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50, original=False):
+def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50, original=False):
 
     # FOR ALL SUBJECTS
-    n_subjects = 18 if dataset == 'fulsang' else 13
-    batch_size = 128 if dataset == 'fulsang' else 256
+    n_subjects = 18 if dataset == 'fulsang' or dataset == 'jaulab' else 13
     alphas = np.logspace(-7,7, 15)
 
     for n in range(n_subjects):
@@ -155,11 +170,14 @@ def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50
         if dataset == 'fulsang':
             train_set = FulsangDataset(data_path, 'train', subject)
             val_set = FulsangDataset(data_path, 'val', subject)
+        elif dataset == 'jaulab':
+            train_set = JaulabDataset(data_path, 'train', subject)
+            val_set = JaulabDataset(data_path, 'val', subject)
         else:
             train_set = HugoMapped(range(9), data_path, participant=n)
             val_set = HugoMapped(range(9, 12), data_path, participant=n)
         
-        if dataset == 'fulsang':
+        if dataset == 'fulsang' or dataset == 'jaulab':
             train_eeg, train_stim = train_set.eeg, train_set.stima 
             val_eeg, val_stim = val_set.eeg, val_set.stima 
         else:
@@ -176,7 +194,7 @@ def train_ridge(dataset, data_path, mdl_save_path, date, start_lag=0, end_lag=50
 
         # SAVE THE MODEL
         # save best final model
-        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', 'Ridge_'+date)
+        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', 'Ridge_'+key)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)
         subj = get_subject(n, n_subjects)

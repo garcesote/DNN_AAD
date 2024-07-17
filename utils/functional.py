@@ -5,13 +5,22 @@ def get_subject(idx, n_subjects):
     subjects = ['S' + str(i+1) for i in range(n_subjects)]
     return subjects[idx]
 
-def get_trials(split):
+def get_trials(split, n_trials):
+
+    partitions = [0.7, 0.15, 0.15] # sum to 1
+    n_train = int(partitions[0]*n_trials)
+    n_val = int(partitions[1]*n_trials)
+    n_test = int(partitions[2]*n_trials)
+
+    adjustment = n_trials - (n_train + n_val + n_test)
+    n_train += adjustment
+
     if split == 'train':
-        return np.arange(0,40)
+        return np.arange(0, n_train)
     elif split == 'val':
-        return np.arange(40,50)
+        return np.arange(n_train , n_trials - n_val)
     elif split == 'test':
-        return np.arange(50,60)
+        return np.arange(n_trials - n_val, n_trials)
     else:
         raise ValueError('Field split must be a train/val/test value')
 
