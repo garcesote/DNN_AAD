@@ -1,18 +1,12 @@
 import torch
 import os
-from utils.functional import get_subject, get_trials, normalize, correlation
-from utils.datasets import FulsangDataset, HugoMapped, JaulabDataset
+from utils.functional import get_subject, correlation, get_params, check_jaulab_chan, get_Dataset
 from utils.dnn import FCNN, CNN
 from utils.ridge import Ridge
-from torch.utils.data import Dataset, DataLoader
-from torch.optim import NAdam
+from torch.utils.data import DataLoader
 import torch.nn as nn
 import numpy as np
 import pickle
-from collections.abc import Iterable
-import operator
-import functools
-import scipy
 import json
 
 # SELECT NO RANDOM STATE
@@ -24,59 +18,31 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-subj_jaulab_60electr = ['S13','S16']
-
 def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, max_epoch = 200, early_stopping_patience = 10):
     
-    data_subj = {'fulsang': 18, 'jaulab': 17, 'hugo': 13}
-    n_subjects = data_subj[dataset]
-    n_channels = {'fulsang': 64, 'jaulab': 61, 'hugo': 63}
-    n_chan = n_channels[dataset]
-    batch_sizes = {'fulsang': 128, 'jaulab': 128, 'hugo': 256} # training with windows of 2s
-    batch_size = batch_sizes[dataset]
+    n_subjects, n_chan, batch_size = get_params(dataset)
 
     for n in range(n_subjects):
         
         subject = get_subject(n, n_subjects)
-        if dataset=='jaulab' and subject in subj_jaulab_60electr :
-            n_chan = 60
-        elif dataset=='jaulab':
-            n_chan = 61
+        
+        if dataset == 'jaulab':
+            n_chan = check_jaulab_chan(subject)
 
         print(f'Training {model} with {dataset} data on {subject}...')
 
         if model == 'FCNN':
-            # FCNN (atención con el número de canales dependiendo del dataset)
             mdl = FCNN(n_hidden = 3, dropout_rate=0.45, n_chan=n_chan)
             optimizer = torch.optim.NAdam(mdl.parameters(), lr=1e-6, weight_decay = 1e-4)
         else:
-            # CNN
             mdl = CNN(F1=8, D=8, F2=64, dropout=0.2, input_channels=n_chan)
             optimizer = torch.optim.NAdam(mdl.parameters(), lr=2e-5, weight_decay = 1e-8)
 
         mdl.to(device)
 
-        if dataset == 'fulsang':
-            train_set = FulsangDataset(data_path, 'train', subject)
-            train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
-            # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
-            val_set = FulsangDataset(data_path, 'val', subject)
-            val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
-            # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)), pin_memory=True)
-        elif dataset == 'jaulab':
-            train_set = JaulabDataset(data_path, 'train', subject)
-            train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
-            # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
-            val_set = JaulabDataset(data_path, 'val', subject)
-            val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
-            # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)), pin_memory=True)
-        else:
-            train_set = HugoMapped(range(9), data_path, participant=n)
-            train_loader = DataLoader(train_set, batch_size = batch_size, pin_memory=True)
-            # train_loader = DataLoader(train_set, batch_size = batch_size, sampler = torch.randperm(len(train_set)), pin_memory=True)
-            val_set = HugoMapped(range(9, 12), data_path, participant=n)
-            val_loader = DataLoader(val_set, batch_size = batch_size, pin_memory=True)
-            # val_loader = DataLoader(val_set, batch_size = batch_size, sampler = torch.randperm(len(val_set)),pin_memory=True)
+        train_set, val_set = get_Dataset(dataset, data_path, subject, n, train=True)
+        train_loader, val_loader = DataLoader(train_set, batch_size, suffle=False, pin_memory=True),  DataLoader(val_set, batch_size, suffle=False, pin_memory=True)
+
 
         # early stopping parameters
         best_accuracy=0
@@ -112,6 +78,7 @@ def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, 
             mdl.eval()
             accuracies = []
 
+            # evaluate
             with torch.no_grad():
 
                 for batch, (x,y) in enumerate(val_loader):
@@ -133,7 +100,6 @@ def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, 
                 best_accuracy = mean_accuracy
                 best_epoch = epoch
                 best_state_dict = mdl.state_dict()
-
 
         # save best final model
         mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model+'_'+key)
@@ -158,7 +124,7 @@ def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, 
 def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50, original=False):
 
     # FOR ALL SUBJECTS
-    n_subjects = 18 if dataset == 'fulsang' or dataset == 'jaulab' else 13
+    n_subjects, n_chan, batch_size = get_params(dataset)
     alphas = np.logspace(-7,7, 15)
 
     for n in range(n_subjects):
@@ -167,15 +133,7 @@ def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50,
         
         mdl = Ridge(start_lag=start_lag, end_lag=end_lag, alpha=alphas, original=original)
         
-        if dataset == 'fulsang':
-            train_set = FulsangDataset(data_path, 'train', subject)
-            val_set = FulsangDataset(data_path, 'val', subject)
-        elif dataset == 'jaulab':
-            train_set = JaulabDataset(data_path, 'train', subject)
-            val_set = JaulabDataset(data_path, 'val', subject)
-        else:
-            train_set = HugoMapped(range(9), data_path, participant=n)
-            val_set = HugoMapped(range(9, 12), data_path, participant=n)
+        train_set, val_set = get_Dataset(dataset, data_path, subject, n, train=True)
         
         if dataset == 'fulsang' or dataset == 'jaulab':
             train_eeg, train_stim = train_set.eeg, train_set.stima 
@@ -193,7 +151,6 @@ def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50,
         print(f'Model for subject {n} trained with a score of {scores[best_alpha]} with alpha = {best_alpha}')
 
         # SAVE THE MODEL
-        # save best final model
         mdl_folder = os.path.join(mdl_save_path, dataset + '_data', 'Ridge_'+key)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)

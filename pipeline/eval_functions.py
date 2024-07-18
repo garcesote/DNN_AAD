@@ -3,7 +3,7 @@ import os
 from utils.datasets import HugoMapped, FulsangDataset, JaulabDataset
 from utils.dnn import CNN, FCNN
 from torch.utils.data import DataLoader
-from utils.functional import correlation, get_subject
+from utils.functional import correlation, get_subject, check_jaulab_chan, get_params, get_filname, get_Dataset
 from statistics import mean
 import numpy as np
 import pickle
@@ -14,53 +14,24 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def get_filname(mdl_folder_path, subject):
-    list_dir = os.listdir(mdl_folder_path)
-    filename = ''
-    for file in list_dir:
-        if subject in file:
-            if subject == 'S1':
-                idx = file.index(subject)
-                if file[idx+2] == '_': # si el siguiente caracter al S1 es un barra baja añade al diccionario
-                    filename = file
-            else:
-                filename = file
-    return filename
-
-subj_jaulab_60electr = ['S13','S16']
-
-def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key):
+def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=False):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
     # FOR ALL SUBJECTS
-    data_subj = {'fulsang': 18, 'jaulab': 17, 'hugo': 13}
-    n_subjects = data_subj[dataset]
-    n_channels = {'fulsang': 64, 'jaulab': 61, 'hugo': 63}
-    n_chan = n_channels[dataset]
-    batch_sizes = {'fulsang': 128, 'jaulab': 128, 'hugo': 256} # training with windows of 2s
-    batch_size = batch_sizes[dataset]
+    n_subjects, n_chan, batch_size = get_params(dataset)
 
     eval_results = {}
 
     for n in range(n_subjects):
 
         subj = get_subject(n, n_subjects)
-        if dataset=='jaulab' and subj in subj_jaulab_60electr :
-            n_chan = 60
-        elif dataset=='jaulab':
-            n_chan = 61
+        if dataset == 'jaulab':
+            n_chan = check_jaulab_chan(subj)
 
         # LOAD DATA
-        if dataset == 'fulsang':
-            test_set = FulsangDataset(data_path, 'test', subj)
-            test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)
-        if dataset == 'jaulab':
-            test_set = JaulabDataset(data_path, 'test', subj)
-            test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)        
-        else:
-            test_set = HugoMapped(range(12,15), data_path, participant=n)
-            test_loader = DataLoader(test_set, batch_size = batch_size, pin_memory=True)
+        test_set = get_Dataset(dataset, data_path, subj, n, train=False)
+        test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
 
         # OBTAIN MODEL PATH
         filename = dataset
@@ -103,8 +74,7 @@ def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key):
 
 def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path):
 
-    n_subjects = 18 if dataset=='fulsang' or dataset == 'jaulab' else 13
-    batch_size = 125 if dataset=='fulsang' or dataset == 'jaulab' else 256
+    n_subjects, n_chan, batch_size= get_params(dataset)
     eval_results = {}
 
     for n in range(n_subjects):
@@ -116,7 +86,7 @@ def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path):
         mdl = pickle.load(open(filename, 'rb'))
 
         # CARGA EL TEST_SET
-        test_dataset = HugoMapped(range(12, 15), data_path, participant=n)
+        test_dataset = get_Dataset(dataset, data_path, subj, n, train=False)
         test_eeg, test_stim = test_dataset.eeg, test_dataset.stim
 
         # EVALÚA EN FUNCIÓN DEL MEJOR ALPHA/MODELO OBTENIDO

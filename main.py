@@ -1,5 +1,5 @@
 from pipeline.training_functions import train_dnn, train_ridge
-from pipeline.eval_functions import eval_dnn
+from pipeline.eval_functions import eval_dnn, eval_ridge
 
 # REPRODUCING TRAINING DNN RESULTS
 models = ['FCNN', 'CNN']
@@ -24,10 +24,12 @@ results_save_path = 'Results/eval_metrics/'
 #         data_path = hugo_path if dataset == 'hugo' else fulsang_path
 #         train_dnn(model=model, dataset=dataset, data_path=data_path, date=date, mdl_save_path=mdl_save_path, metrics_save_path=metrics_save_path, max_epoch=1)
 
+
 # TRAINIG RIDGE
-# for dataset in datasets:
-#     data_path = hugo_path if dataset == 'hugo' else fulsang_path
-#     train_ridge(dataset, data_path, mdl_save_path=mdl_save_path, date=date, original=False)
+dataset = 'jaulab'
+data_path = jaulab_path
+train_ridge(dataset, data_path, mdl_save_path=mdl_save_path, key=date, original=False)
+eval_ridge(dataset, data_path, mdl_save_path, key= date, dst_save_path= results_save_path)
 
 # results_save_path = 'Results/eval_metrics/'
 
@@ -37,10 +39,10 @@ results_save_path = 'Results/eval_metrics/'
 #         data_path = hugo_path if dataset == 'hugo' else fulsang_path
 #         eval_dnn(model, dataset, data_path, results_save_path, mdl_save_path, date)
 
-dataset = 'jaulab'
-model = 'FCNN'
+# dataset = 'jaulab'
+# model = 'FCNN'
 
-for dataset in datasets:
-    for model in models:
-        train_dnn(model, dataset, jaulab_path, metrics_save_path, date, mdl_save_path, max_epoch=200)
-        eval_dnn(model, dataset, jaulab_path, results_save_path, mdl_save_path, date)
+# for dataset in datasets:
+#     for model in models:
+#         train_dnn(model, dataset, jaulab_path, metrics_save_path, date, mdl_save_path, max_epoch=200)
+#         eval_dnn(model, dataset, jaulab_path, results_save_path, mdl_save_path, date)
