@@ -151,7 +151,8 @@ def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50,
         print(f'Model for subject {n} trained with a score of {scores[best_alpha]} with alpha = {best_alpha}')
 
         # SAVE THE MODEL
-        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', 'Ridge_'+key)
+        model = 'Ridge_'+key if not original else 'Ridge_Original_'+key
+        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)
         subj = get_subject(n, n_subjects)

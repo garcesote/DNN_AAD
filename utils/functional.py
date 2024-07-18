@@ -49,16 +49,16 @@ def correlation(x: torch.tensor, y: torch.tensor, eps=1e-8):
     return corr
 
 # Returns the corresponding subject data in datasets
-def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True):
+def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True, acc=False):
 
     if dataset == 'fulsang':
         train_set = FulsangDataset(data_path, 'train', subject)
         val_set = FulsangDataset(data_path, 'val', subject)
-        test_set = FulsangDataset(data_path, 'test', subject)
+        test_set = FulsangDataset(data_path, 'test', subject) if not acc else FulsangDataset(data_path, 'test', subject, mode='acc')
     elif dataset == 'jaulab':
         train_set = JaulabDataset(data_path, 'train', subject)
         val_set = JaulabDataset(data_path, 'val', subject)
-        test_set = JaulabDataset(data_path, 'test', subject)
+        test_set = JaulabDataset(data_path, 'test', subject) if not acc else JaulabDataset(data_path, 'test', subject, mode='acc')
     else:
         train_set = HugoMapped(range(9), data_path, participant=n)
         val_set = HugoMapped(range(9, 12), data_path, participant=n)

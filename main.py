@@ -1,5 +1,5 @@
 from pipeline.training_functions import train_dnn, train_ridge
-from pipeline.eval_functions import eval_dnn, eval_ridge
+from pipeline.eval_functions import decode_attention, eval_dnn, eval_ridge
 
 # REPRODUCING TRAINING DNN RESULTS
 models = ['FCNN', 'CNN']
@@ -16,6 +16,7 @@ date = '17_07'
 mdl_save_path = 'Results/models'
 metrics_save_path = 'Results/train_metrics'
 results_save_path = 'Results/eval_metrics/'
+accuracies_save_path = 'Results/decode_accuracy'
 
 
 # TRAIN DNN
@@ -28,8 +29,8 @@ results_save_path = 'Results/eval_metrics/'
 # TRAINIG RIDGE
 dataset = 'jaulab'
 data_path = jaulab_path
-train_ridge(dataset, data_path, mdl_save_path=mdl_save_path, key=date, original=False)
-eval_ridge(dataset, data_path, mdl_save_path, key= date, dst_save_path= results_save_path)
+# train_ridge(dataset, data_path, mdl_save_path=mdl_save_path, key=date, original=True)
+# eval_ridge(dataset, data_path, mdl_save_path, key= date, dst_save_path= results_save_path, original=True)
 
 # results_save_path = 'Results/eval_metrics/'
 
@@ -46,3 +47,12 @@ eval_ridge(dataset, data_path, mdl_save_path, key= date, dst_save_path= results_
 #     for model in models:
 #         train_dnn(model, dataset, jaulab_path, metrics_save_path, date, mdl_save_path, max_epoch=200)
 #         eval_dnn(model, dataset, jaulab_path, results_save_path, mdl_save_path, date)
+
+# DECODING ACCURACY
+models = ['FCNN', 'CNN']
+window_lenghts = [128, 640, 1600]
+dataset = 'jaulab'
+
+for model in models:
+    for win in window_lenghts:
+        decode_attention(model, dataset, win, jaulab_path, mdl_save_path, accuracies_save_path, key=date)
