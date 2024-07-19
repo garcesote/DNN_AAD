@@ -49,10 +49,11 @@ data_path = jaulab_path
 #         eval_dnn(model, dataset, jaulab_path, results_save_path, mdl_save_path, date)
 
 # DECODING ACCURACY
-models = ['FCNN', 'CNN']
+# models = ['FCNN', 'CNN']
 window_lenghts = [128, 640, 1600]
 dataset = 'jaulab'
+model = 'CNN'
 
-for model in models:
-    for win in window_lenghts:
-        decode_attention(model, dataset, win, jaulab_path, mdl_save_path, accuracies_save_path, key=date)
+# for model in models:
+for win in window_lenghts:
+    decode_attention(model, dataset, win, jaulab_path, mdl_save_path, accuracies_save_path, key=date)

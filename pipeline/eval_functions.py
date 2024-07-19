@@ -127,11 +127,11 @@ def decode_attention(model, dataset, window_len, data_path, mdl_path, dst_save_p
 
         attended_correct = 0
 
-        if model == 'Ridge':
+        if model == 'Ridge' or  model == 'Ridge_Original':
             
             # CARGA EL MODELO
             subj = get_subject(n, n_subjects)
-            mdl_folder_path = os.path.join(mdl_path, dataset + '_data', 'Ridge_'+key)
+            mdl_folder_path = os.path.join(mdl_path, dataset + '_data', model+'_'+key)
             filename = get_filname(mdl_folder_path, subj)
             mdl = pickle.load(open(os.path.join(mdl_folder_path, filename), 'rb'))
 
