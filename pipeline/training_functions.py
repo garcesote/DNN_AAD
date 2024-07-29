@@ -3,10 +3,12 @@ import os
 from utils.functional import get_subject, correlation, get_params, check_jaulab_chan, get_Dataset
 from utils.dnn import FCNN, CNN
 from utils.ridge import Ridge
+from utils.datasets import JaulabDatasetWindows, FulsangDatasetWindows
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import numpy as np
 import pickle
+from statistics import mean
 import json
 
 # SELECT NO RANDOM STATE
@@ -41,7 +43,7 @@ def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, 
         mdl.to(device)
 
         train_set, val_set = get_Dataset(dataset, data_path, subject, n, train=True)
-        train_loader, val_loader = DataLoader(train_set, batch_size, suffle=False, pin_memory=True),  DataLoader(val_set, batch_size, suffle=False, pin_memory=True)
+        train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
 
 
         # early stopping parameters
@@ -158,3 +160,57 @@ def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50,
         subj = get_subject(n, n_subjects)
         save_path = os.path.join(mdl_folder, subj+f'_alpha={best_alpha}_acc={scores[best_alpha]:.4f}')
         pickle.dump(mdl, open(save_path, "wb"))
+
+def leave_one_out_ridge(dataset, datapath, window, original, subject, save_path, start_lag = 0, end_lag = 26):
+
+    # Create alpha values from 10^-7 to 10^7
+    # alphas = np.logspace(-7,7, 15)
+
+    mdl = Ridge(start_lag=start_lag, end_lag=end_lag, alpha=0.2, original=original)
+
+    # if window > 26:
+    #     trials = 48
+    # else:
+    #     trials = 96
+
+    trials = 60
+    
+    corr = []
+    attended_correct = np.zeros((15))
+
+    for idx in range(trials):
+
+        print(f'Ridge: Leaving trial {idx} out using a {window}s window on subject {subject}')
+
+        # Returns the trials for training and the one for validating on the splitted windows
+        data_set = FulsangDatasetWindows(datapath, subject, window, cross_val_index=idx)
+
+        mdl.fit(data_set.eeg.T, data_set.stima[:, np.newaxis])
+
+        # VALIDATE AND SELECT BEST ALPHA
+        scores_a = mdl.model_selection(data_set.val_eeg.T, data_set.val_stima[:, np.newaxis])
+        scores_b = mdl.model_selection(data_set.val_eeg.T, data_set.val_stimb[:, np.newaxis])
+        for alpha_idx in range(len(scores_a)):
+            if scores_a[alpha_idx] > scores_b[alpha_idx]:
+                attended_correct[alpha_idx] += 1
+
+        best_alpha = mdl.best_alpha_idx
+
+        print(f'Model for subject {subject} trained with a score of {scores_a[best_alpha]} with alpha = {best_alpha}')
+
+        corr.append(scores_a[best_alpha])
+
+    print(f'Mean corr with best alpha: ', mean(corr))
+    print(f'Number of correct classification for each alpha: ', attended_correct)
+
+    
+
+
+
+
+
+
+
+
+
+

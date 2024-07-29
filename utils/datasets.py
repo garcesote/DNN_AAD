@@ -5,6 +5,23 @@ import numpy as np
 import h5py
 import os
 
+def get_windows(eeg_data, stima_data, stimb_data, n_window, window_samples, len_trial):
+
+     # If the number is less than 1 (only case of win_size=50s) concat the trials 2 by 2
+    if n_window < 1:
+        n_window = 1
+        eeg_windows = [normalize(torch.tensor(eeg_data[trial]+eeg_data[trial+1]).T) for trial in range(0, len_trial, 2)]
+        stima_windows = [torch.squeeze(torch.tensor(stima_data[trial]+stima_data[trial+1])) for trial in range(0, len_trial, 2)]
+        stimb_windows = [torch.squeeze(torch.tensor(stimb_data[trial]+stima_data[trial+1])) for trial in range(0, len_trial, 2)]
+    
+    # If not return the necessary windows (eg: 26s returns a complete trial, 10s returns 2 windows for trial)
+    else:
+        eeg_windows = [normalize(torch.tensor(eeg_data[trial][win*window_samples:(win+1)*window_samples,:]).T) for win in range(int(n_window)) for trial in range(0, len_trial)]
+        stima_windows = [torch.squeeze(torch.tensor(stima_data[trial][win*window_samples:(win+1)*window_samples,:])) for win in range(int(n_window)) for trial in range(0, len_trial)]
+        stimb_windows = [torch.squeeze(torch.tensor(stimb_data[trial][win*window_samples:(win+1)*window_samples,:])) for win in range(int(n_window)) for trial in range(0, len_trial)]
+        
+    return eeg_windows, stima_windows, stimb_windows
+
 # turn a tensor to 0 mean and std of 1 with shape (C, T) and return shape (C)   
 def normalize(tensor: torch.tensor):
 
@@ -148,10 +165,6 @@ class JaulabDataset(Dataset):
         stimb_data = preproc_data['data']['wavB'][0,0][0,trials]
         len_trial = len(trials)
 
-        # si hay mas canales de la cuenta selecciono los 64 primeros
-        if eeg_data[0].shape[1] > 64:
-            eeg_data = [trial[:,:64] for trial in eeg_data]
-
         # Concatenar en un tensor todas las muestras (muestras * trials, canales) => (T * N, C).T => (C, T * N)
         self.eeg = torch.hstack([normalize(torch.tensor(eeg_data[trial]).T) for trial in range(len_trial)])
         self.stima = torch.squeeze(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)]))
@@ -185,3 +198,90 @@ class JaulabDataset(Dataset):
                 return window, self.stima[idx]
     def __len__(self):
         return self.samples * self.trials
+    
+
+class JaulabDatasetWindows(Dataset):
+
+    def __init__(self, folder_path, subject, window = 50, cross_val_index = 0):
+
+        data_path = os.path.join(folder_path ,subject + '_preproc.mat')
+        preproc_data = scipy.io.loadmat(data_path)
+
+        n_trials = 96
+        trials = np.arange(n_trials)
+
+        # Array con n trials y dentro las muestras de audio y eeg
+        eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
+        stima_data = preproc_data['data']['wavA'][0,0][0,trials]
+        stimb_data = preproc_data['data']['wavB'][0,0][0,trials]
+        len_trial = len(trials)
+
+        self.trials = len_trial
+        self.samples = eeg_data[0].shape[0]
+        self.channels = eeg_data[0].shape[1]
+        self.subject = subject
+        self.fs = 64
+        self.window_samples = self.fs * window
+
+        # Get the number of windows per trial
+        self.n_window = self.samples // self.window_samples
+
+        # Get the data splitted by windows (list) with the corresponding data of that window (tensors)
+        eeg_windows, stima_windows, stimb_windows = get_windows(eeg_data, stima_data, stimb_data, n_window, self.window_samples, len_trial)
+
+        self.windows = len(eeg_windows)
+
+        # Returns the concatenated window data outside from the trial selected for validation 
+        self.eeg = torch.hstack([eeg[:, :self.window_samples] for i, eeg in enumerate(eeg_windows) if i not in list(range(cross_val_index, cross_val_index + self.n_window))])
+        self.stima = torch.cat([stima[:self.window_samples] for i, stima in enumerate(stima_windows) if i not in list(range(cross_val_index, cross_val_index + self.n_window))])
+        self.stimb = torch.cat([stimb[:self.window_samples] for i, stimb in enumerate(stimb_windows) if i not in list(range(cross_val_index, cross_val_index + self.n_window))])
+
+        # Returns the concatenated window data corresponding to the validation trial
+        self.val_eeg = torch.hstack([eeg[:, :self.window_samples] for eeg in eeg_windows[cross_val_index: cross_val_index + self.n_window]])
+        self.val_stima = torch.cat([stima[:self.window_samples] for stima in stima_windows[cross_val_index: cross_val_index + self.n_window]])
+        self.val_stimb = torch.cat([stimb[:self.window_samples] for stimb in stimb_windows[cross_val_index: cross_val_index + self.n_window]])
+
+class FulsangDatasetWindows(Dataset):
+
+    def __init__(self, folder_path, subject, window = 50, cross_val_index = 0):
+
+        data_path = os.path.join(folder_path ,subject + '_data_preproc.mat')
+        preproc_data = scipy.io.loadmat(data_path)
+
+        n_trials = 60
+        trials = np.arange(n_trials)
+
+        # Array con n trials y dentro las muestras de audio y eeg
+        eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
+        stima_data = preproc_data['data']['wavA'][0,0][0,trials]
+        stimb_data = preproc_data['data']['wavB'][0,0][0,trials]
+        len_trial = len(trials)
+
+        # si hay mas canales de la cuenta selecciono los 64 primeros
+        if eeg_data[0].shape[1] > 64:
+            eeg_data = [trial[:,:64] for trial in eeg_data]
+
+        self.trials = len_trial
+        self.samples = eeg_data[0].shape[0]
+        self.channels = eeg_data[0].shape[1]
+        self.subject = subject
+        self.fs = 64
+        self.window_samples = self.fs * window
+
+        # Get the number of windows per trial
+        self.n_window = self.samples // self.window_samples
+
+        # Get the data splitted by windows (list) with the corresponding data of that window (tensors)
+        eeg_windows, stima_windows, stimb_windows = get_windows(eeg_data, stima_data, stimb_data, self.n_window, self.window_samples, len_trial)
+
+        self.windows = len(eeg_windows)
+
+        # Returns the concatenated window data outside from the trial selected for validation 
+        self.eeg = torch.hstack([eeg[:, :self.window_samples] for i, eeg in enumerate(eeg_windows) if i not in list(range(cross_val_index, cross_val_index + self.n_window))])
+        self.stima = torch.cat([stima[:self.window_samples] for i, stima in enumerate(stima_windows) if i not in list(range(cross_val_index, cross_val_index + self.n_window))])
+        self.stimb = torch.cat([stimb[:self.window_samples] for i, stimb in enumerate(stimb_windows) if i not in list(range(cross_val_index, cross_val_index + self.n_window))])
+
+        # Returns the concatenated window data corresponding to the validation trial
+        self.val_eeg = torch.hstack([eeg[:, :self.window_samples] for eeg in eeg_windows[cross_val_index: cross_val_index + self.n_window]])
+        self.val_stima = torch.cat([stima[:self.window_samples] for stima in stima_windows[cross_val_index: cross_val_index + self.n_window]])
+        self.val_stimb = torch.cat([stimb[:self.window_samples] for stimb in stimb_windows[cross_val_index: cross_val_index + self.n_window]])

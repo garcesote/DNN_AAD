@@ -62,7 +62,7 @@ def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True, a
     else:
         train_set = HugoMapped(range(9), data_path, participant=n)
         val_set = HugoMapped(range(9, 12), data_path, participant=n)
-        val_set = HugoMapped(range(9, 12), data_path, participant=n)
+        test_set = HugoMapped(range(12, 15), data_path, participant=n)
 
     if train:
         return train_set, val_set
