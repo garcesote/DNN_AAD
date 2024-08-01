@@ -20,14 +20,10 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, max_epoch = 200, early_stopping_patience = 10, filt_path = None):
+def train_dnn(model, dataset, subjects, data_path, metrics_save_path, key, mdl_save_path, max_epoch = 200, early_stopping_patience = 10, population = False, filt_path = None):
     
-    n_subjects, n_chan, batch_size = get_params(dataset)
+    def training_loop(train_loader, val_loader, subject):
 
-    for n in range(n_subjects):
-        
-        subject = get_subject(n, n_subjects)
-        
         if dataset == 'jaulab':
             n_chan = check_jaulab_chan(subject)
 
@@ -41,10 +37,6 @@ def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, 
             optimizer = torch.optim.NAdam(mdl.parameters(), lr=2e-5, weight_decay = 1e-8)
 
         mdl.to(device)
-
-        train_set, val_set = get_Dataset(dataset, data_path, subject, n, train=True, norm_stim=True, filt=True, filt_path=filt_path)
-        train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
-
 
         # early stopping parameters
         best_accuracy=0
@@ -123,19 +115,38 @@ def train_dnn(model, dataset, data_path, metrics_save_path, key, mdl_save_path, 
         json.dump(train_loss, open(os.path.join(train_folder, subject+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
         json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
 
-def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50, original=False, filt_path = None):
+    n_subjects, n_chan, batch_size = get_params(dataset)
+
+    if not isinstance(subjects, list):
+        subjects = [subjects]
+    
+    if population:
+        # Obtain the remaining subject on the population setting for saving the results
+        all_subjects = ['S'+str(n) for n in range(1, n_subjects)]
+        subject = list(set(all_subjects) - set(subjects))[0]
+        train_set, val_set = get_Dataset(dataset, data_path, subjects, train=True, norm_stim=True, filt=True, filt_path=filt_path)
+        train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
+        training_loop(train_loader, val_loader, subject)
+    else:
+        for n, subject in enumerate(subjects):
+            train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=True, filt_path=filt_path)
+            train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
+            training_loop(train_loader, val_loader, subject)
+           
+
+def train_ridge(dataset, subjects, data_path, mdl_save_path, key, start_lag=0, end_lag=50, original=False, filt_path = None):
 
     # FOR ALL SUBJECTS
-    n_subjects, n_chan, batch_size = get_params(dataset)
     alphas = np.logspace(-7,7, 15)
 
-    for n in range(n_subjects):
+    if not isinstance(subjects, list):
+        subjects = [subjects]
 
-        subject = get_subject(n, n_subjects)
+    for n, subject in enumerate(subjects):
         
         mdl = Ridge(start_lag=start_lag, end_lag=end_lag, alpha=alphas, original=original)
         
-        train_set, val_set = get_Dataset(dataset, data_path, subject, n, train=True, norm_stim=True, filt=True, filt_path=filt_path)
+        train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=True, filt_path=filt_path)
         
         if dataset == 'fulsang' or dataset == 'jaulab':
             train_eeg, train_stim = train_set.eeg, train_set.stima 
@@ -157,8 +168,7 @@ def train_ridge(dataset, data_path, mdl_save_path, key, start_lag=0, end_lag=50,
         mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)
-        subj = get_subject(n, n_subjects)
-        save_path = os.path.join(mdl_folder, subj+f'_alpha={best_alpha}_acc={scores[best_alpha]:.4f}')
+        save_path = os.path.join(mdl_folder, subject+f'_alpha={best_alpha}_acc={scores[best_alpha]:.4f}')
 
         pickle.dump(mdl, open(save_path, "wb"))
 

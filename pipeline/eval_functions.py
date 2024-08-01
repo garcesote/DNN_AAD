@@ -14,18 +14,19 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=False, filt_path = None):
+def eval_dnn(model, dataset, subjects,data_path, dst_save_path, mdl_path, key, accuracy=False, filt_path = None):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
-    # FOR ALL SUBJECTS
     n_subjects, n_chan, batch_size = get_params(dataset)
+
+    if not isinstance(subjects, list):
+        subjects = [subjects]
 
     eval_results = {}
 
-    for n in range(n_subjects):
+    for n, subj in enumerate(subjects):
 
-        subj = get_subject(n, n_subjects)
         if dataset == 'jaulab':
             n_chan = check_jaulab_chan(subj)
 
@@ -72,15 +73,17 @@ def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=F
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
 
 
-def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path, original = False, filt_path = None):
+def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, original = False, filt_path = None):
 
     n_subjects, n_chan, batch_size= get_params(dataset)
     eval_results = {}
 
-    for n in range(n_subjects):
+    if not isinstance(subjects, list):
+        subjects = [subjects]
+
+    for n, subj in enumerate(subjects):
 
         # CARGA EL MODELO
-        subj = get_subject(n, n_subjects)
         model = 'Ridge_'+key if not original else 'Ridge_Original_'+key
         mdl_folder_path = os.path.join(mdl_path, dataset + '_data', model)
         filename = get_filname(mdl_folder_path, subj)
@@ -108,16 +111,19 @@ def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path, original = Fals
 
 
 # Save the decoding accuracy of each model, only fulsang and jaulab datasets are valid as hugo_data doesn't present two competing stimuli
-def decode_attention(model, dataset, window_len, data_path, mdl_path, dst_save_path, key, filt_path = None):
+def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, dst_save_path, key, filt_path = None):
 
     n_subjects, n_chan, batch_size = get_params(dataset)
     accuracies = []
 
+    if not isinstance(subjects, list):
+        subjects = [subjects] 
+    
+
     print('Decoding '+model+' on '+dataset+' dataset')
 
-    for n in range(n_subjects):
+    for n, subj in enumerate(subjects):
 
-        subj = get_subject(n, n_subjects)
         if dataset == 'jaulab':
             n_chan = check_jaulab_chan(subj)
 
@@ -130,7 +136,6 @@ def decode_attention(model, dataset, window_len, data_path, mdl_path, dst_save_p
         if model == 'Ridge' or  model == 'Ridge_Original':
             
             # CARGA EL MODELO
-            subj = get_subject(n, n_subjects)
             mdl_folder_path = os.path.join(mdl_path, dataset + '_data', model+'_'+key)
             filename = get_filname(mdl_folder_path, subj)
             mdl = pickle.load(open(os.path.join(mdl_folder_path, filename), 'rb'))

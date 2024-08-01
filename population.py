@@ -21,14 +21,23 @@ metrics_save_path = 'Results/train_metrics'
 results_save_path = 'Results/eval_metrics/'
 accuracies_save_path = 'Results/decode_accuracy'
 
-subject = 'S13'
+excluded_subj = set(['S1'])
+# Excluding jaulab subjects with 60 electrodes instead of 61
+excluded_jaulab_subj = set(['S13', 'S16'])
 
-# # TRAIN DNN
+# Path where the data is located
+subjects = {'hugo_subj' : list(set(['S'+str(n) for n in range(1, 14)]) - excluded_subj),
+        'fulsang_subj' : list(set(['S'+str(n) for n in range(1, 19)]) - excluded_subj),
+        'jaulab_subj' : list(set(['S'+str(n) for n in range(1, 18)]) - excluded_subj - excluded_jaulab_subj)
+}
+
+
+# TRAIN DNN
 for model in models:
     for dataset in datasets:
         data_path = paths[dataset+'_path']
-        train_dnn(model=model, dataset=dataset, subjects=subject, data_path=data_path, key=date, mdl_save_path=mdl_save_path,
-                  metrics_save_path=metrics_save_path, max_epoch=10, filt_path=paths[dataset+'_filt_path'])
+        train_dnn(model=model, dataset=dataset, subjects=subjects[dataset+'_subj'], data_path=data_path, key=date, mdl_save_path=mdl_save_path,
+                  metrics_save_path=metrics_save_path, max_epoch=10, population = True, filt_path=paths[dataset+'_filt_path'])
 
 # # EVALUATE DNN
 # for model in models:
@@ -53,5 +62,3 @@ for model in models:
 #     for model in models:
 #         for win in window_lenghts:
 #             decode_attention(model, dataset, subject, win, paths[dataset+'_path'], mdl_save_path, accuracies_save_path, key=date, filt_path=paths[dataset+'_filt_path'])
-
-# leave_one_out_ridge(dataset='fulsang', datapath=paths['fulsang_path'], window = 50, original=True, subject='S12', save_path='x')

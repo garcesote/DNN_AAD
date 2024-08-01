@@ -48,14 +48,21 @@ def correlation(x: torch.tensor, y: torch.tensor, eps=1e-8):
     corr = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)) + eps)
     return corr
 
+# Returns the subjects not present in the list
+def get_excluded_subject(subjects):
+    n_subjects = len(subjects) + 1
+    all_subjects = ['S'+str(n) for n in range(1, n_subjects)]
+    subject = list(set(all_subjects) - set(subjects))[0]
+    return subject
+
 # Returns the corresponding subject data in dataset
-def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True, acc=False, norm_stim=False, filt=False, filt_path=None):
+def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=False, norm_stim=False, filt=False, filt_path=None):
 
     '''
     Input params:
         dataset: select dataset between 'fulsang', 'jaulab' or 'hugo
         data_path: path where the data from the subjects is located
-        subject: specify the subject from which get the data, eg: 'S1'
+        subject: specify the subject or subjects from which get the data, eg: ['S1'] or ['S2' ... 'S18']
         n: index of the corresponding subject
         train: select whether you are getting val and train sets or the test set
         acc: returns the dataset with the attended only or attended and unattended stim for decode the accuracy
@@ -64,18 +71,28 @@ def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True, a
         filt_path: select the path of the filtered data
     '''
 
+    if not isinstance(subjects, list):
+        subjects = [subjects]
+
+    n = [int(subj[1:]) for subj in subjects]
+
+    if len(subjects) > 1:
+        val_test_subj = get_excluded_subject(subjects)
+    else:
+        val_test_subj = subjects
+
     if dataset == 'fulsang':
         if train:
-            train_set = FulsangDataset(data_path, 'train', subject, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
-            val_set = FulsangDataset(data_path, 'val', subject, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            train_set = FulsangDataset(data_path, 'train', subjects, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            val_set = FulsangDataset(data_path, 'val', subjects, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
         else:
-            test_set = FulsangDataset(data_path, 'test', subject, acc=acc,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            test_set = FulsangDataset(data_path, 'test', subjects, acc=acc,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
     elif dataset == 'jaulab':
         if train:
-            train_set = JaulabDataset(data_path, 'train', subject, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
-            val_set = JaulabDataset(data_path, 'val', subject,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            train_set = JaulabDataset(data_path, 'train', subjects, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            val_set = JaulabDataset(data_path, 'val', subjects,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
         else:
-            test_set = JaulabDataset(data_path, 'test', subject, acc=acc, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            test_set = JaulabDataset(data_path, 'test', subjects, acc=acc, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
     else:
         if train:
             train_set = HugoMapped(range(9), data_path, participant=n)
