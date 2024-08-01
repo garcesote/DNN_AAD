@@ -14,7 +14,7 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=False):
+def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=False, filt_path = None):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
@@ -30,7 +30,7 @@ def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=F
             n_chan = check_jaulab_chan(subj)
 
         # LOAD DATA
-        test_set = get_Dataset(dataset, data_path, subj, n, train=False)
+        test_set = get_Dataset(dataset, data_path, subj, n, train=False, norm_stim=True, filt=True, filt_path=filt_path)
         test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
 
         # OBTAIN MODEL PATH
@@ -72,7 +72,7 @@ def eval_dnn(model, dataset, data_path, dst_save_path, mdl_path, key, accuracy=F
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
 
 
-def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path, original = False):
+def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path, original = False, filt_path = None):
 
     n_subjects, n_chan, batch_size= get_params(dataset)
     eval_results = {}
@@ -87,7 +87,7 @@ def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path, original = Fals
         mdl = pickle.load(open(os.path.join(mdl_folder_path, filename), 'rb'))
 
         # CARGA EL TEST_SET
-        test_dataset = get_Dataset(dataset, data_path, subj, n, train=False)
+        test_dataset = get_Dataset(dataset, data_path, subj, n, train=False, norm_stim=True, filt=True, filt_path=filt_path)
         if dataset == 'fulsang' or dataset == 'jaulab':
             test_eeg, test_stim = test_dataset.eeg, test_dataset.stima
         else:
@@ -108,7 +108,7 @@ def eval_ridge(dataset, data_path, mdl_path, key, dst_save_path, original = Fals
 
 
 # Save the decoding accuracy of each model, only fulsang and jaulab datasets are valid as hugo_data doesn't present two competing stimuli
-def decode_attention(model, dataset, window_len, data_path, mdl_path, dst_save_path, key):
+def decode_attention(model, dataset, window_len, data_path, mdl_path, dst_save_path, key, filt_path = None):
 
     n_subjects, n_chan, batch_size = get_params(dataset)
     accuracies = []
@@ -122,7 +122,7 @@ def decode_attention(model, dataset, window_len, data_path, mdl_path, dst_save_p
             n_chan = check_jaulab_chan(subj)
 
         # LOAD DATA
-        test_set = get_Dataset(dataset, data_path, subj, n, train=False, acc=True)
+        test_set = get_Dataset(dataset, data_path, subj, n, train=False, acc=True, norm_stim=True, filt=True, filt_path=filt_path)
         test_loader = DataLoader(test_set, window_len, shuffle=False, pin_memory=True)
 
         attended_correct = 0

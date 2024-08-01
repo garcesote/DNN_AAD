@@ -48,21 +48,40 @@ def correlation(x: torch.tensor, y: torch.tensor, eps=1e-8):
     corr = torch.sum(vx * vy) / (torch.sqrt(torch.sum(vx ** 2)) * torch.sqrt(torch.sum(vy ** 2)) + eps)
     return corr
 
-# Returns the corresponding subject data in datasets
-def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True, acc=False):
+# Returns the corresponding subject data in dataset
+def get_Dataset(dataset:str, data_path:str, subject:str, n: int, train = True, acc=False, norm_stim=False, filt=False, filt_path=None):
+
+    '''
+    Input params:
+        dataset: select dataset between 'fulsang', 'jaulab' or 'hugo
+        data_path: path where the data from the subjects is located
+        subject: specify the subject from which get the data, eg: 'S1'
+        n: index of the corresponding subject
+        train: select whether you are getting val and train sets or the test set
+        acc: returns the dataset with the attended only or attended and unattended stim for decode the accuracy
+        norm_stim : normalize the stimulus of fulsang and jaulab dataset
+        file: select the filtered fulsang or jaulab data
+        filt_path: select the path of the filtered data
+    '''
 
     if dataset == 'fulsang':
-        train_set = FulsangDataset(data_path, 'train', subject)
-        val_set = FulsangDataset(data_path, 'val', subject)
-        test_set = FulsangDataset(data_path, 'test', subject) if not acc else FulsangDataset(data_path, 'test', subject, mode='acc')
+        if train:
+            train_set = FulsangDataset(data_path, 'train', subject, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            val_set = FulsangDataset(data_path, 'val', subject, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+        else:
+            test_set = FulsangDataset(data_path, 'test', subject, acc=acc,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
     elif dataset == 'jaulab':
-        train_set = JaulabDataset(data_path, 'train', subject)
-        val_set = JaulabDataset(data_path, 'val', subject)
-        test_set = JaulabDataset(data_path, 'test', subject) if not acc else JaulabDataset(data_path, 'test', subject, mode='acc')
+        if train:
+            train_set = JaulabDataset(data_path, 'train', subject, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            val_set = JaulabDataset(data_path, 'val', subject,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+        else:
+            test_set = JaulabDataset(data_path, 'test', subject, acc=acc, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
     else:
-        train_set = HugoMapped(range(9), data_path, participant=n)
-        val_set = HugoMapped(range(9, 12), data_path, participant=n)
-        test_set = HugoMapped(range(12, 15), data_path, participant=n)
+        if train:
+            train_set = HugoMapped(range(9), data_path, participant=n)
+            val_set = HugoMapped(range(9, 12), data_path, participant=n)
+        else:
+            test_set = HugoMapped(range(12, 15), data_path, participant=n)
 
     if train:
         return train_set, val_set

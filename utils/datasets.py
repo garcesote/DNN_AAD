@@ -31,6 +31,15 @@ def normalize(tensor: torch.tensor):
 
     return (tensor - mean) / std
 
+# turn a tensor to 0 mean and std of 1 with shape (T)
+def normalize_stim(tensor: torch.tensor):
+
+    # unsqueeze necesario para el broadcasting (10) => (10, 1)
+    mean = torch.mean(tensor)
+    std = torch.std(tensor)
+
+    return (tensor - mean) / std
+
 # Return the required trials for splitting correctly the dataset introducing the 
 def get_trials(split: str, n_trials: int):
 
@@ -53,7 +62,7 @@ def get_trials(split: str, n_trials: int):
 
 class FulsangDataset(Dataset):
 
-    def __init__(self, folder_path, split, subject, window = 50, mode='corr'):
+    def __init__(self, folder_path, split, subject, window = 50, acc=False, norm_stim=False, filt = False, filt_path=None):
 
         data_path = os.path.join(folder_path ,subject + '_data_preproc.mat')
         preproc_data = scipy.io.loadmat(data_path)
@@ -62,10 +71,15 @@ class FulsangDataset(Dataset):
         trials = get_trials(split, n_trials)
 
         # Array con n trials y dentro las muestras de audio y eeg
-        eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
+        # eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
         stima_data = preproc_data['data']['wavA'][0,0][0,trials]
         stimb_data = preproc_data['data']['wavB'][0,0][0,trials]
         len_trial = len(trials)
+
+        if filt:
+            eeg_data = np.load(os.path.join(filt_path, subject+'_data_filt.npy'), allow_pickle=True)[trials]
+        else:
+            eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
 
         # si hay mas canales de la cuenta selecciono los 64 primeros
         if eeg_data[0].shape[1] > 64:
@@ -73,20 +87,20 @@ class FulsangDataset(Dataset):
 
         # Concatenar en un tensor todas las muestras (muestras * trials, canales) => (T * N, C).T => (C, T * N)
         self.eeg = torch.hstack([normalize(torch.tensor(eeg_data[trial]).T) for trial in range(len_trial)])
-        self.stima = torch.squeeze(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)]))
-        self.stimb = torch.squeeze(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)]))
+        self.stima = torch.squeeze(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)])) if not norm_stim else torch.squeeze(normalize_stim(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)])))
+        self.stimb = torch.squeeze(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)])) if not norm_stim else torch.squeeze(normalize_stim(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)])))
 
         self.trials = len_trial
         self.samples = eeg_data[0].shape[0]
         self.channels = eeg_data[0].shape[1]
         self.window = window
         self.subject = subject
-        self.mode = mode
+        self.acc = acc
 
     def __getitem__(self,idx):
         rest = self.window - (self.samples * self.trials - idx)
 
-        if self.mode == 'acc':
+        if self.acc:
             # Si se coge la ventana entera sin llegar al final
             if rest < 0:
                 return self.eeg[:, idx:idx+self.window], self.stima[idx], self.stimb[idx]
@@ -151,7 +165,7 @@ class HugoMapped(Dataset):
     
 class JaulabDataset(Dataset):
 
-    def __init__(self, folder_path, split, subject, window = 50, mode='corr'):
+    def __init__(self, folder_path, split, subject, window = 50, acc=False, norm_stim = False, filt = False, filt_path=None):
 
         data_path = os.path.join(folder_path ,subject + '_preproc.mat')
         preproc_data = scipy.io.loadmat(data_path)
@@ -160,27 +174,32 @@ class JaulabDataset(Dataset):
         trials = get_trials(split, n_trials)
 
         # Array con n trials y dentro las muestras de audio y eeg
-        eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
+        # eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
         stima_data = preproc_data['data']['wavA'][0,0][0,trials]
         stimb_data = preproc_data['data']['wavB'][0,0][0,trials]
         len_trial = len(trials)
 
+        if filt:
+            eeg_data = np.load(os.path.join(filt_path, subject+'_data_filt.npy'), allow_pickle=True)[trials]
+        else:
+            eeg_data = preproc_data['data']['eeg'][0,0][0,trials]
+        
         # Concatenar en un tensor todas las muestras (muestras * trials, canales) => (T * N, C).T => (C, T * N)
         self.eeg = torch.hstack([normalize(torch.tensor(eeg_data[trial]).T) for trial in range(len_trial)])
-        self.stima = torch.squeeze(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)]))
-        self.stimb = torch.squeeze(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)]))
+        self.stima = torch.squeeze(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)])) if not norm_stim else torch.squeeze(normalize_stim(torch.vstack([torch.tensor(stima_data[trial]) for trial in range(len_trial)])))
+        self.stimb = torch.squeeze(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)])) if not norm_stim else torch.squeeze(normalize_stim(torch.vstack([torch.tensor(stimb_data[trial]) for trial in range(len_trial)])))
 
         self.trials = len_trial
         self.samples = eeg_data[0].shape[0]
         self.channels = eeg_data[0].shape[1]
         self.window = window
         self.subject = subject
-        self.mode = mode
+        self.acc = acc
 
     def __getitem__(self,idx):
         rest = self.window - (self.samples * self.trials - idx)
 
-        if self.mode == 'acc':
+        if self.acc:
             # Si se coge la ventana entera sin llegar al final
             if rest < 0:
                 return self.eeg[:, idx:idx+self.window], self.stima[idx], self.stimb[idx]
@@ -227,7 +246,7 @@ class JaulabDatasetWindows(Dataset):
         self.n_window = self.samples // self.window_samples
 
         # Get the data splitted by windows (list) with the corresponding data of that window (tensors)
-        eeg_windows, stima_windows, stimb_windows = get_windows(eeg_data, stima_data, stimb_data, n_window, self.window_samples, len_trial)
+        eeg_windows, stima_windows, stimb_windows = get_windows(eeg_data, stima_data, stimb_data, self.n_window, self.window_samples, len_trial)
 
         self.windows = len(eeg_windows)
 
