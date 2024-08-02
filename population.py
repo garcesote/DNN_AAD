@@ -1,9 +1,12 @@
 from pipeline.training_functions import train_dnn, train_ridge, leave_one_out_ridge
 from pipeline.eval_functions import decode_attention, eval_dnn, eval_ridge
 
-# REPRODUCING TRAINING DNN RESULTS
-models = ['FCNN', 'CNN']
-datasets = ['jaulab', 'fulsang']
+'''
+    POPULATION SCRIPT: Train and validate models for the validation strategy of leaving-one-subject-out, where all subjcts except one are used
+    for training and the excluded is used for validating and test the network.
+'''
+models = ['CNN', 'FCNN']
+datasets = ['fulsang', 'jaulab']
 
 # Path where the data is located
 paths = {'hugo_path' : "C:/Users/jaulab/Desktop/AAD/Data/Hugo_2022/hugo_preproc_data",
@@ -14,12 +17,12 @@ paths = {'hugo_path' : "C:/Users/jaulab/Desktop/AAD/Data/Hugo_2022/hugo_preproc_
 }
 
 # Select the date for saving models and metrics
-date = '01_08'
+date = '02_08'
 
-mdl_save_path = 'Results/models'
-metrics_save_path = 'Results/train_metrics'
-results_save_path = 'Results/eval_metrics/'
-accuracies_save_path = 'Results/decode_accuracy'
+mdl_save_path = 'Results_population/models'
+metrics_save_path = 'Results_population/train_metrics'
+results_save_path = 'Results_population/eval_metrics/'
+accuracies_save_path = 'Results_population/decode_accuracy'
 
 excluded_subj = set(['S1'])
 # Excluding jaulab subjects with 60 electrodes instead of 61
@@ -31,19 +34,18 @@ subjects = {'hugo_subj' : list(set(['S'+str(n) for n in range(1, 14)]) - exclude
         'jaulab_subj' : list(set(['S'+str(n) for n in range(1, 18)]) - excluded_subj - excluded_jaulab_subj)
 }
 
-
 # TRAIN DNN
+# for dataset in datasets:
+#     for model in models:
+#         data_path = paths[dataset+'_path']
+#         train_dnn(model=model, dataset=dataset, subjects=subjects[dataset+'_subj'], data_path=data_path, key=date, mdl_save_path=mdl_save_path,
+#                   metrics_save_path=metrics_save_path, max_epoch=200, population = True, filt_path=paths[dataset+'_filt_path'])
+
+# EVALUATE DNN
 for model in models:
     for dataset in datasets:
         data_path = paths[dataset+'_path']
-        train_dnn(model=model, dataset=dataset, subjects=subjects[dataset+'_subj'], data_path=data_path, key=date, mdl_save_path=mdl_save_path,
-                  metrics_save_path=metrics_save_path, max_epoch=10, population = True, filt_path=paths[dataset+'_filt_path'])
-
-# # EVALUATE DNN
-# for model in models:
-#     for dataset in datasets:
-#         data_path = paths[dataset+'_path']
-#         eval_dnn(model, dataset, subject, data_path, results_save_path, mdl_save_path, date , filt_path=paths[dataset+'_filt_path'])
+        eval_dnn(model, dataset, list(excluded_subj), data_path, results_save_path, mdl_save_path, date , population=True, filt_path=paths[dataset+'_filt_path'])
 
 # # TRAINIG RIDGE
 # for dataset in datasets:

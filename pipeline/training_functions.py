@@ -1,6 +1,6 @@
 import torch
 import os
-from utils.functional import get_subject, correlation, get_params, check_jaulab_chan, get_Dataset
+from utils.functional import correlation, get_params, check_jaulab_chan, get_Dataset, get_excluded_subject
 from utils.dnn import FCNN, CNN
 from utils.ridge import Ridge
 from utils.datasets import JaulabDatasetWindows, FulsangDatasetWindows
@@ -22,10 +22,7 @@ else:
 
 def train_dnn(model, dataset, subjects, data_path, metrics_save_path, key, mdl_save_path, max_epoch = 200, early_stopping_patience = 10, population = False, filt_path = None):
     
-    def training_loop(train_loader, val_loader, subject):
-
-        if dataset == 'jaulab':
-            n_chan = check_jaulab_chan(subject)
+    def training_loop(train_loader, val_loader, subject, n_chan):
 
         print(f'Training {model} with {dataset} data on {subject}...')
 
@@ -115,23 +112,23 @@ def train_dnn(model, dataset, subjects, data_path, metrics_save_path, key, mdl_s
         json.dump(train_loss, open(os.path.join(train_folder, subject+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
         json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
 
-    n_subjects, n_chan, batch_size = get_params(dataset)
+    n_subjects, n_chan, batch_size, _ = get_params(dataset)
 
     if not isinstance(subjects, list):
         subjects = [subjects]
     
     if population:
-        # Obtain the remaining subject on the population setting for saving the results
-        all_subjects = ['S'+str(n) for n in range(1, n_subjects)]
-        subject = list(set(all_subjects) - set(subjects))[0]
-        train_set, val_set = get_Dataset(dataset, data_path, subjects, train=True, norm_stim=True, filt=True, filt_path=filt_path)
+        subject = get_excluded_subject(subjects, dataset)
+        train_set, val_set = get_Dataset(dataset, data_path, subjects, train=True, norm_stim=True, filt=True, filt_path=filt_path, population=population)
         train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
-        training_loop(train_loader, val_loader, subject)
+        training_loop(train_loader, val_loader, subject, n_chan)
     else:
         for n, subject in enumerate(subjects):
-            train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=True, filt_path=filt_path)
+            train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=True, filt_path=filt_path, population=population)
             train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
-            training_loop(train_loader, val_loader, subject)
+            if dataset == 'jaulab':
+                n_chan = check_jaulab_chan(subject)
+            training_loop(train_loader, val_loader, subject, n_chan)
            
 
 def train_ridge(dataset, subjects, data_path, mdl_save_path, key, start_lag=0, end_lag=50, original=False, filt_path = None):

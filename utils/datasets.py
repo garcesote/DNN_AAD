@@ -40,43 +40,13 @@ def normalize_stim(tensor: torch.tensor):
 
     return (tensor - mean) / std
 
-# Return the required trials for splitting correctly the dataset introducing the 
-def get_trials(split: str, n_trials: int):
-
-    partitions = [0.7, 0.15, 0.15] # sum to 1
-    n_train = int(partitions[0]*n_trials)
-    n_val = int(partitions[1]*n_trials)
-    n_test = int(partitions[2]*n_trials)
-
-    adjustment = n_trials - (n_train + n_val + n_test)
-    n_train += adjustment
-
-    if split == 'train':
-        return np.arange(0, n_train)
-    elif split == 'val':
-        return np.arange(n_train , n_trials - n_val)
-    elif split == 'test':
-        return np.arange(n_trials - n_val, n_trials)
-    else:
-        raise ValueError('Field split must be a train/val/test value')
-    
-def get_population_trials(split: str, n_trials: int):
-    # Train case with all the trials corresponding to the train subjects
-    if split == 'train':
-        return np.arange(n_trials)
-    # Val and test case with half of the samples each for the excluded subject
-    elif split == 'val':
-        return np.arange(0, int(n_trials/2))
-    elif split == 'test':
-        return np.arange(int(n_trials/2), n_trials)
-    else:
-        raise ValueError('Field split must be a train/val/test value')
-
 class FulsangDataset(Dataset):
 
-    def __init__(self, folder_path, split, subjects, window = 50, acc=False, norm_stim=False, filt = False, filt_path=None):
+    def __init__(self, folder_path, trials, subjects, window = 50, acc=False, norm_stim=False, filt = False, filt_path=None):
 
-        
+        if not isinstance(subjects, list):
+            subjects = [subjects]
+            
         eeg = []
         stima = []
         stimb = []
@@ -84,13 +54,6 @@ class FulsangDataset(Dataset):
         for subject in subjects:
             data_path = os.path.join(folder_path ,subject + '_data_preproc.mat')
             preproc_data = scipy.io.loadmat(data_path)
-
-            n_trials = 60
-
-            if len(subjects) > 1:
-                trials = get_population_trials(split, n_trials)
-            else:    
-                trials = get_trials(split, n_trials)
 
             # Array con n trials y dentro las muestras de audio y eeg
             stima_data = preproc_data['data']['wavA'][0,0][0,trials]
@@ -120,11 +83,13 @@ class FulsangDataset(Dataset):
         self.samples = eeg_data[0].shape[0]
         self.channels = eeg_data[0].shape[1]
         self.window = window
-        self.subject = subject
+        self.subject = subjects
+        self.n_subjects = len(subjects)
         self.acc = acc
 
     def __getitem__(self,idx):
-        rest = self.window - (self.samples * self.trials - idx)
+
+        rest = self.window - (self.samples * self.trials * self.n_subjects - idx)
 
         if self.acc:
             # Si se coge la ventana entera sin llegar al final
@@ -137,7 +102,8 @@ class FulsangDataset(Dataset):
         else:
             # Si se coge la ventana entera sin llegar al final
             if rest < 0:
-                return self.eeg[:, idx:idx+self.window], self.stima[idx]
+                window = self.eeg[:, idx:idx+self.window]
+                return window, self.stima[idx]
             # Si llega al final, añadirle las muestras que faltan
             else:
                 window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
@@ -185,7 +151,7 @@ class HugoMapped(Dataset):
     
 class JaulabDataset(Dataset):
 
-    def __init__(self, folder_path, split, subjects, window = 50, acc=False, norm_stim = False, filt = False, filt_path=None):
+    def __init__(self, folder_path, trials, subjects, window = 50, acc=False, norm_stim = False, filt = False, filt_path=None):
         
         if not isinstance(subjects, list):
             subjects = [subjects]
@@ -197,13 +163,6 @@ class JaulabDataset(Dataset):
         for subject in subjects:
             data_path = os.path.join(folder_path ,subject + '_preproc.mat')
             preproc_data = scipy.io.loadmat(data_path)
-
-            n_trials = 96
-            if len(subjects) > 1:
-                trials = np.arange(n_trials)
-            else:    
-                trials = get_trials(split, n_trials)
-
 
             # Array con n trials y dentro las muestras de audio y eeg
             stima_data = preproc_data['data']['wavA'][0,0][0,trials]
@@ -229,11 +188,12 @@ class JaulabDataset(Dataset):
         self.samples = eeg_data[0].shape[0]
         self.channels = eeg_data[0].shape[1]
         self.window = window
-        self.subject = subject
+        self.subject = subjects
+        self.n_subjects = len(subjects)
         self.acc = acc
 
     def __getitem__(self,idx):
-        rest = self.window - (self.samples * self.trials - idx)
+        rest = self.window - (self.samples * self.trials  * self.n_subjects - idx)
 
         if self.acc:
             # Si se coge la ventana entera sin llegar al final

@@ -1,9 +1,13 @@
 from pipeline.training_functions import train_dnn, train_ridge, leave_one_out_ridge
 from pipeline.eval_functions import decode_attention, eval_dnn, eval_ridge
 
-# REPRODUCING TRAINING DNN RESULTS
-models = ['FCNN', 'CNN']
-datasets = ['jaulab', 'fulsang']
+'''
+    MAIN SCRIPT: Train and evaluate the different datasets on the different models fro the subject specif case. Select the subjects
+    you want yoor network to train on
+'''
+
+models = ['CNN']
+datasets = ['fulsang']
 
 # Path where the data is located
 paths = {'hugo_path' : "C:/Users/jaulab/Desktop/AAD/Data/Hugo_2022/hugo_preproc_data",

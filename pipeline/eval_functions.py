@@ -14,11 +14,11 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model, dataset, subjects,data_path, dst_save_path, mdl_path, key, accuracy=False, filt_path = None):
+def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, accuracy=False, population = False, filt_path = None):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
-    n_subjects, n_chan, batch_size = get_params(dataset)
+    n_subjects, n_chan, batch_size, _ = get_params(dataset)
 
     if not isinstance(subjects, list):
         subjects = [subjects]
@@ -30,10 +30,9 @@ def eval_dnn(model, dataset, subjects,data_path, dst_save_path, mdl_path, key, a
         if dataset == 'jaulab':
             n_chan = check_jaulab_chan(subj)
 
-        # LOAD DATA
-        test_set = get_Dataset(dataset, data_path, subj, n, train=False, norm_stim=True, filt=True, filt_path=filt_path)
+        test_set = get_Dataset(dataset, data_path, subj, train=False, norm_stim=True, population=population, filt=True, filt_path=filt_path)
         test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
-
+        
         # OBTAIN MODEL PATH
         filename = dataset
         folder_path = os.path.join(mdl_path , dataset + '_data', model+'_'+key)
@@ -75,7 +74,7 @@ def eval_dnn(model, dataset, subjects,data_path, dst_save_path, mdl_path, key, a
 
 def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, original = False, filt_path = None):
 
-    n_subjects, n_chan, batch_size= get_params(dataset)
+    n_subjects, n_chan, batch_size, _= get_params(dataset)
     eval_results = {}
 
     if not isinstance(subjects, list):
@@ -113,7 +112,7 @@ def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, origi
 # Save the decoding accuracy of each model, only fulsang and jaulab datasets are valid as hugo_data doesn't present two competing stimuli
 def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, dst_save_path, key, filt_path = None):
 
-    n_subjects, n_chan, batch_size = get_params(dataset)
+    n_subjects, n_chan, batch_size, _ = get_params(dataset)
     accuracies = []
 
     if not isinstance(subjects, list):
