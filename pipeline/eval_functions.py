@@ -14,7 +14,7 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, accuracy=False, population = False, filt_path = None):
+def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, accuracy=False, population = False, filt = False, filt_path = None):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
@@ -30,7 +30,7 @@ def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, 
         if dataset == 'jaulab':
             n_chan = check_jaulab_chan(subj)
 
-        test_set = get_Dataset(dataset, data_path, subj, train=False, norm_stim=True, population=population, filt=True, filt_path=filt_path)
+        test_set = get_Dataset(dataset, data_path, subj, train=False, norm_stim=True, population=population, filt=filt, filt_path=filt_path)
         test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
         
         # OBTAIN MODEL PATH
@@ -49,6 +49,9 @@ def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, 
         mdl.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
         mdl.to(device)
 
+        # insert the number of samples for performing the circular time shift to obtain the null distribution, in this case between 1 and 2s
+        time_shift = 200 if dataset == 'hugo' else 50
+
         # EVALUATE THE MODEL
         accuracies = []
         with torch.no_grad():
@@ -58,17 +61,20 @@ def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, 
                 y = y.to(device, dtype=torch.float)
         
                 y_hat, loss = mdl(x)
-                acc = correlation(y, y_hat)
+
+                acc = correlation(torch.roll(y, time_shift), y_hat)
+                # null_acc = correlation(torch.roll(y, time_shift), y_hat)
                 accuracies.append(acc.item())
 
         eval_results[subj] = accuracies
+
         print(f'Subject {subj} | acc_mean {mean(accuracies)}')
 
     # SAVE RESULTS
     dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = model+'_'+key+'_Results'
+    filename = model+'_'+key+'_null_distr_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
 
 
@@ -89,12 +95,16 @@ def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, origi
         mdl = pickle.load(open(os.path.join(mdl_folder_path, filename), 'rb'))
 
         # CARGA EL TEST_SET
-        test_dataset = get_Dataset(dataset, data_path, subj, n, train=False, norm_stim=True, filt=True, filt_path=filt_path)
+        test_dataset = get_Dataset(dataset, data_path, subj, train=False, norm_stim=True, filt=True, filt_path=filt_path)
         if dataset == 'fulsang' or dataset == 'jaulab':
             test_eeg, test_stim = test_dataset.eeg, test_dataset.stima
         else:
             test_eeg, test_stim = test_dataset.eeg, test_dataset.stim
+        
+        # insert the number of samples for performing the circular time shift to obtain the null distribution, in this case between 1 and 2s
+        time_shift = 200 if dataset == 'hugo' else 100
 
+        test_stim = torch.roll(torch.tensor(test_stim), time_shift)
 
         # EVALÚA EN FUNCIÓN DEL MEJOR ALPHA/MODELO OBTENIDO
         scores = mdl.score_in_batches(test_eeg.T, test_stim[:, np.newaxis], batch_size=batch_size) # ya selecciona el best alpha solo
@@ -110,7 +120,7 @@ def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, origi
 
 
 # Save the decoding accuracy of each model, only fulsang and jaulab datasets are valid as hugo_data doesn't present two competing stimuli
-def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, dst_save_path, key, filt_path = None):
+def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, dst_save_path, key, population = False, filt = True, filt_path = None):
 
     n_subjects, n_chan, batch_size, _ = get_params(dataset)
     accuracies = []
@@ -119,7 +129,7 @@ def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, 
         subjects = [subjects] 
     
 
-    print('Decoding '+model+' on '+dataset+' dataset')
+    print(f'Decoding {model} on {dataset} dataset with a window of {str(window_len/64)}')
 
     for n, subj in enumerate(subjects):
 
@@ -127,8 +137,8 @@ def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, 
             n_chan = check_jaulab_chan(subj)
 
         # LOAD DATA
-        test_set = get_Dataset(dataset, data_path, subj, n, train=False, acc=True, norm_stim=True, filt=True, filt_path=filt_path)
-        test_loader = DataLoader(test_set, window_len, shuffle=False, pin_memory=True)
+        test_set = get_Dataset(dataset, data_path, subj, train=False, acc=True, norm_stim=True, population=population, filt=filt, filt_path=filt_path)
+        test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
 
         attended_correct = 0
 

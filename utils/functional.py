@@ -83,17 +83,17 @@ def correlation(x: torch.tensor, y: torch.tensor, eps=1e-8):
     return corr
 
 # Returns the subjects not present in the list
-def get_excluded_subject(subjects, dataset):
+def get_other_subjects(subject, dataset):
     
     # Obtain the remaining subject on the population setting for saving the results
     # BUG: in the case of the dataset jaulab, subjects 13 and 16 aren't used because of the electrodes used
     # so delete them from the excludad subjects list adn differ it when defining the number of total subjects
-    n_subjects = len(subjects) + 1 if dataset !=  'jaulab' else len(subjects) + 3
-    all_subjects = ['S'+str(n) for n in range(1, n_subjects)]
-    excl_subject = list(set(all_subjects) - set(subjects))
-    
-    subject = excl_subject[0] if dataset != 'jaulab' else list(set(excl_subject) - set(['S13','S16']))[0]
-    return subject
+    jaulab_bug_subj = [13, 16]
+    ds_subjects = {'fulsang': ['S'+str(n) for n in range(1, 19)], 
+                   'jaulab': ['S'+str(n) for n in range(1, 18) if n not in jaulab_bug_subj],
+                   'hugo': ['S'+str(n) for n in range(1, 13)]}
+    other_subjects = list(set(ds_subjects[dataset]) - set(subject))
+    return other_subjects
 
 # Returns the corresponding subject data in dataset
 def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=False, norm_stim=False, filt=False, filt_path=None, population = False):
@@ -108,8 +108,8 @@ def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=Fa
         norm_stim : normalize the stimulus of fulsang and jaulab dataset
         file: select the filtered fulsang or jaulab data
         filt_path: select the path of the filtered data
-        population: return the sets from the population model where half of the trials for the excluded subject are used for train and val and
-                    the other subjects used for training, or the set for subject specific with 70%/15%/15% on the specify subject
+        population: returns the sets from the population model where half of the trials for the excluded subject are used for test and val and
+                    the other subjects used for training, or the set for subject specific with 70%/15%/15% spliy on the specified subject
     '''
 
     if not isinstance(subjects, list):
@@ -117,33 +117,32 @@ def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=Fa
 
     n = [int(subj[1:]) for subj in subjects]
 
-    if train:
-        # when population setting select the excluded subject for the test and train datasets
-        val_subj = [get_excluded_subject(subjects, dataset)]  if population else subjects
-
+    # when population setting select the rest of the subjects for training
+    train_subj = subjects if not population else get_other_subjects(subjects, dataset)
+    n_train = [int(subj[1:]) for subj in train_subj]
     _, _, _, n_trials = get_params(dataset)
 
     if dataset == 'fulsang':
         if train:
             train_trials = get_population_trials('train', n_trials) if population else get_trials('train', n_trials)
-            train_set = FulsangDataset(data_path, train_trials, subjects, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            train_set = FulsangDataset(data_path, train_trials, train_subj, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
             val_trials = get_population_trials('val', n_trials) if population else get_trials('val', n_trials)
-            val_set = FulsangDataset(data_path, val_trials, val_subj, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            val_set = FulsangDataset(data_path, val_trials, subjects, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
         else:
             test_trials = get_population_trials('test', n_trials) if population else get_trials('test', n_trials)
             test_set = FulsangDataset(data_path, test_trials, subjects, acc=acc,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
     elif dataset == 'jaulab':
         if train:
             train_trials = get_population_trials('train', n_trials) if population else get_trials('train', n_trials)
-            train_set = JaulabDataset(data_path, train_trials, subjects, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            train_set = JaulabDataset(data_path, train_trials, train_subj, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
             val_trials = get_population_trials('val', n_trials) if population else get_trials('val', n_trials)
-            val_set = JaulabDataset(data_path, val_trials, val_subj,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
+            val_set = JaulabDataset(data_path, val_trials, subjects,  norm_stim=norm_stim, filt=filt, filt_path=filt_path)
         else:
             test_trials = get_population_trials('test', n_trials) if population else get_trials('test', n_trials)
             test_set = JaulabDataset(data_path, test_trials, subjects, acc=acc, norm_stim=norm_stim, filt=filt, filt_path=filt_path)
     else:
         if train:
-            train_set = HugoMapped(range(9), data_path, participant=n)
+            train_set = HugoMapped(range(9), data_path, participant=n_train)
             val_set = HugoMapped(range(9, 12), data_path, participant=n)
         else:
             test_set = HugoMapped(range(12, 15), data_path, participant=n)
