@@ -29,6 +29,7 @@ def get_trials(split: str, n_trials: int):
     else:
         raise ValueError('Field split must be a train/val/test value')
     
+# Returns the corresponding trials for the population setting 
 def get_population_trials(split: str, n_trials: int):
     # Train case with all the trials corresponding to the train subjects
     if split == 'train':
@@ -96,7 +97,8 @@ def get_other_subjects(subject, dataset):
     return other_subjects
 
 # Returns the corresponding subject data in dataset
-def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=False, norm_stim=False, filt=False, filt_path=None, population = False):
+def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=False, 
+                norm_stim=False, filt=False, filt_path=None, population = False):
 
     '''
     Input params:

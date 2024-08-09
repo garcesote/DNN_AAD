@@ -14,7 +14,8 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, accuracy=False, population = False, filt = False, filt_path = None):
+def eval_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, dst_save_path:str, mdl_path:str, key:str, 
+             accuracy=False, population = False, filt = False, filt_path = None):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 
@@ -24,14 +25,19 @@ def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, 
         subjects = [subjects]
 
     eval_results = {}
+    nd_results = {} # contruct a null distribution when evaluating
+
+    # insert the number of samples for performing the circular time shift to obtain the null distribution, in this case between 1 and 2s
+    time_shift = 200 if dataset == 'hugo' else 100
 
     for n, subj in enumerate(subjects):
 
         if dataset == 'jaulab':
             n_chan = check_jaulab_chan(subj)
 
-        test_set = get_Dataset(dataset, data_path, subj, train=False, norm_stim=True, population=population, filt=filt, filt_path=filt_path)
-        test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
+        test_set = get_Dataset(dataset, data_path, subj, train=False, acc=accuracy, norm_stim=True, 
+                               population=population, filt=filt, filt_path=filt_path)
+        test_loader = DataLoader(test_set, window_len, shuffle=False, pin_memory=True)
         
         # OBTAIN MODEL PATH
         filename = dataset
@@ -49,11 +55,9 @@ def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, 
         mdl.load_state_dict(torch.load(model_path, map_location=torch.device(device)))
         mdl.to(device)
 
-        # insert the number of samples for performing the circular time shift to obtain the null distribution, in this case between 1 and 2s
-        time_shift = 200 if dataset == 'hugo' else 50
-
         # EVALUATE THE MODEL
-        accuracies = []
+        corr = []
+        nd_corr = []
         with torch.no_grad():
             for i, (x,y) in enumerate(test_loader):
                 
@@ -62,29 +66,36 @@ def eval_dnn(model, dataset, subjects, data_path, dst_save_path, mdl_path, key, 
         
                 y_hat, loss = mdl(x)
 
-                acc = correlation(torch.roll(y, time_shift), y_hat)
-                # null_acc = correlation(torch.roll(y, time_shift), y_hat)
-                accuracies.append(acc.item())
+                nd_acc = correlation(torch.roll(y, time_shift), y_hat)
+                acc = correlation(y, y_hat)
 
-        eval_results[subj] = accuracies
+                corr.append(acc.item())
+                nd_corr.append(nd_acc.item())
 
-        print(f'Subject {subj} | acc_mean {mean(accuracies)}')
+        eval_results[subj] = corr
+        nd_results[subj] = nd_corr
+
+        print(f'Subject {subj} | corr_mean {mean(corr)}')
 
     # SAVE RESULTS
     dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = model+'_'+key+'_null_distr_Results'
+    filename = model+'_'+key+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
+    filename = model+'_'+key+'_nd_Results'
+    json.dump(nd_results, open(os.path.join(dest_path, filename),'w'))
 
 
-def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, original = False, filt_path = None):
+def eval_ridge(dataset:str, subjects:list, window_len:int, data_path:str, mdl_path:str, key:str, dst_save_path:str, 
+               original = False, filt=False, filt_path = None):
 
     n_subjects, n_chan, batch_size, _= get_params(dataset)
     eval_results = {}
+    nd_results = {} # contruct a null distribution for comparing it with the results
 
-    if not isinstance(subjects, list):
-        subjects = [subjects]
+    # insert the number of samples for performing the circular time shift to obtain the null distribution, in this case between 1 and 2s
+    time_shift = 200 if dataset == 'hugo' else 100
 
     for n, subj in enumerate(subjects):
 
@@ -100,27 +111,29 @@ def eval_ridge(dataset, subjects, data_path, mdl_path, key, dst_save_path, origi
             test_eeg, test_stim = test_dataset.eeg, test_dataset.stima
         else:
             test_eeg, test_stim = test_dataset.eeg, test_dataset.stim
-        
-        # insert the number of samples for performing the circular time shift to obtain the null distribution, in this case between 1 and 2s
-        time_shift = 200 if dataset == 'hugo' else 100
 
-        test_stim = torch.roll(torch.tensor(test_stim), time_shift)
+        test_stim_nd = torch.roll(test_stim, time_shift)
 
         # EVALÚA EN FUNCIÓN DEL MEJOR ALPHA/MODELO OBTENIDO
-        scores = mdl.score_in_batches(test_eeg.T, test_stim[:, np.newaxis], batch_size=batch_size) # ya selecciona el best alpha solo
+        scores = mdl.score_in_batches(test_eeg.T, test_stim[:, np.newaxis], batch_size=window_len)
+        scores_nd = mdl.score_in_batches(test_eeg.T, test_stim_nd[:, np.newaxis], batch_size=window_len) # ya selecciona el best alpha solo
         eval_results[subj] = [score for score in np.squeeze(scores)]
+        nd_results[subj] = [score for score in np.squeeze(scores_nd)]
 
-        print(f'Sujeto {n} | accuracy: {np.mean(scores, axis=0)}')
+        print(f'Sujeto {subj} | corr: {np.mean(scores, axis=0)}')
 
     dest_path = dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
     filename = 'Ridge_'+key+'_Results' if not original else 'Ridge_Original_'+key+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
+    filename = 'Ridge_'+key+'_nd_Results' if not original else 'Ridge_Original_'+key+'_nd_Results'
+    json.dump(nd_results, open(os.path.join(dest_path, filename),'w'))
 
 
 # Save the decoding accuracy of each model, only fulsang and jaulab datasets are valid as hugo_data doesn't present two competing stimuli
-def decode_attention(model, dataset, subjects, window_len, data_path, mdl_path, dst_save_path, key, population = False, filt = True, filt_path = None):
+def decode_attention(model:str, dataset:str, subjects:list, window_len:int, data_path:str, mdl_path:str, dst_save_path:str, 
+                     key:str, population = False, filt = True, filt_path = None):
 
     n_subjects, n_chan, batch_size, _ = get_params(dataset)
     accuracies = []

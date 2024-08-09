@@ -20,12 +20,10 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def train_dnn(model, dataset, subjects, data_path, metrics_save_path, key, mdl_save_path, max_epoch = 200, early_stopping_patience = 10, population = False, filt = False, filt_path = None):
+def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, metrics_save_path:str, key:str, mdl_save_path:str,
+              max_epoch = 200, early_stopping_patience = 10, population = False, filt = False, filt_path = None):
     
     n_subjects, n_chan, batch_size, _ = get_params(dataset)
-
-    if not isinstance(subjects, list):
-        subjects = [subjects]
 
     for n, subject in enumerate(subjects):
 
@@ -36,7 +34,7 @@ def train_dnn(model, dataset, subjects, data_path, metrics_save_path, key, mdl_s
 
         # LOAD THE DATA
         train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=filt, filt_path=filt_path, population=population)
-        train_loader, val_loader = DataLoader(train_set, batch_size, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
+        train_loader, val_loader = DataLoader(train_set, window_len, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
 
         # LOAD THE MODEL
         if dataset == 'jaulab':
@@ -128,19 +126,17 @@ def train_dnn(model, dataset, subjects, data_path, metrics_save_path, key, mdl_s
         json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
            
 
-def train_ridge(dataset, subjects, data_path, mdl_save_path, key, start_lag=0, end_lag=50, original=False, filt_path = None):
+def train_ridge(dataset:str, subjects:list, data_path:str, mdl_save_path:str, key:str, start_lag=0, end_lag=50, original=False, 
+                filt=False, filt_path = None):
 
     # FOR ALL SUBJECTS
     alphas = np.logspace(-7,7, 15)
-
-    if not isinstance(subjects, list):
-        subjects = [subjects]
 
     for n, subject in enumerate(subjects):
         
         mdl = Ridge(start_lag=start_lag, end_lag=end_lag, alpha=alphas, original=original)
         
-        train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=True, filt_path=filt_path)
+        train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=filt, filt_path=filt_path)
         
         if dataset == 'fulsang' or dataset == 'jaulab':
             train_eeg, train_stim = train_set.eeg, train_set.stima 
@@ -155,7 +151,7 @@ def train_ridge(dataset, subjects, data_path, mdl_save_path, key, start_lag=0, e
         # VALIDATE AND SELECT BEST ALPHA
         scores = mdl.model_selection(val_eeg.T, val_stim[:, np.newaxis])
         best_alpha = mdl.best_alpha_idx
-        print(f'Model for subject {n} trained with a score of {scores[best_alpha]} with alpha = {best_alpha}')
+        print(f'Ridge trained for subject {subject} with a score of {scores[best_alpha]} with alpha = {best_alpha}')
 
         # SAVE THE MODEL
         model = 'Ridge_'+key if not original else 'Ridge_Original_'+key
