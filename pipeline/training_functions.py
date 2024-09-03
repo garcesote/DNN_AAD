@@ -20,7 +20,7 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, metrics_save_path:str, key:str, mdl_save_path:str,
+def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, metrics_save_path:str, mdl_save_path:str,
               max_epoch = 200, early_stopping_patience = 10, population = False, filt = False, filt_path = None):
     
     n_subjects, n_chan, batch_size, _ = get_params(dataset)
@@ -106,7 +106,7 @@ def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:s
                 best_state_dict = mdl.state_dict()
 
         # save best final model
-        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model+'_'+key)
+        mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)
         torch.save(
@@ -115,18 +115,18 @@ def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:s
         )
 
         # save corresponding metrics
-        val_folder = os.path.join(metrics_save_path, dataset + '_data', 'val', model+'_'+key)
+        val_folder = os.path.join(metrics_save_path, dataset + '_data', 'val', model)
         if not os.path.exists(val_folder):
             os.makedirs(val_folder)
         # save corresponding metrics
-        train_folder = os.path.join(metrics_save_path, dataset + '_data', 'train', model+'_'+key)
+        train_folder = os.path.join(metrics_save_path, dataset + '_data', 'train', model)
         if not os.path.exists(train_folder):
             os.makedirs(train_folder)
         json.dump(train_loss, open(os.path.join(train_folder, subject+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
         json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
            
 
-def train_ridge(dataset:str, subjects:list, data_path:str, mdl_save_path:str, key:str, start_lag=0, end_lag=50, original=False, 
+def train_ridge(dataset:str, subjects:list, data_path:str, mdl_save_path:str, start_lag=0, end_lag=50, original=False, 
                 filt=False, filt_path = None):
 
     # FOR ALL SUBJECTS
@@ -154,7 +154,7 @@ def train_ridge(dataset:str, subjects:list, data_path:str, mdl_save_path:str, ke
         print(f'Ridge trained for subject {subject} with a score of {scores[best_alpha]} with alpha = {best_alpha}')
 
         # SAVE THE MODEL
-        model = 'Ridge_'+key if not original else 'Ridge_Original_'+key
+        model = 'Ridge' if not original else 'Ridge_Original'
         mdl_folder = os.path.join(mdl_save_path, dataset + '_data', model)
         if not os.path.exists(mdl_folder):
             os.makedirs(mdl_folder)

@@ -14,7 +14,7 @@ if torch.cuda.is_available():
 else:
     device = 'cpu'
 
-def eval_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, dst_save_path:str, mdl_path:str, key:str, 
+def eval_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, dst_save_path:str, mdl_path:str, 
              accuracy=False, population = False, filt = False, filt_path = None):
 
     print('Evaluating '+model+' on '+dataset+' dataset')
@@ -41,7 +41,7 @@ def eval_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:st
         
         # OBTAIN MODEL PATH
         filename = dataset
-        folder_path = os.path.join(mdl_path , dataset + '_data', model+'_'+key)
+        folder_path = os.path.join(mdl_path , dataset + '_data', model)
         filename = get_filname(folder_path, subj)
     
         model_path = os.path.join(folder_path, filename)
@@ -81,13 +81,13 @@ def eval_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:st
     dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = model+'_'+key+'_Results'
+    filename = model+'_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
-    filename = model+'_'+key+'_nd_Results'
+    filename = model+'_nd_Results'
     json.dump(nd_results, open(os.path.join(dest_path, filename),'w'))
 
 
-def eval_ridge(dataset:str, subjects:list, window_len:int, data_path:str, mdl_path:str, key:str, dst_save_path:str, 
+def eval_ridge(dataset:str, subjects:list, window_len:int, data_path:str, mdl_path:str, dst_save_path:str, 
                original = False, filt=False, filt_path = None):
 
     n_subjects, n_chan, batch_size, _= get_params(dataset)
@@ -100,7 +100,7 @@ def eval_ridge(dataset:str, subjects:list, window_len:int, data_path:str, mdl_pa
     for n, subj in enumerate(subjects):
 
         # CARGA EL MODELO
-        model = 'Ridge_'+key if not original else 'Ridge_Original_'+key
+        model = 'Ridge' if not original else 'Ridge_Original'
         mdl_folder_path = os.path.join(mdl_path, dataset + '_data', model)
         filename = get_filname(mdl_folder_path, subj)
         mdl = pickle.load(open(os.path.join(mdl_folder_path, filename), 'rb'))
@@ -112,7 +112,7 @@ def eval_ridge(dataset:str, subjects:list, window_len:int, data_path:str, mdl_pa
         else:
             test_eeg, test_stim = test_dataset.eeg, test_dataset.stim
 
-        test_stim_nd = torch.roll(test_stim, time_shift)
+        test_stim_nd = torch.roll(torch.tensor(test_stim), time_shift)
 
         # EVALÚA EN FUNCIÓN DEL MEJOR ALPHA/MODELO OBTENIDO
         scores = mdl.score_in_batches(test_eeg.T, test_stim[:, np.newaxis], batch_size=window_len)
@@ -125,15 +125,15 @@ def eval_ridge(dataset:str, subjects:list, window_len:int, data_path:str, mdl_pa
     dest_path = dest_path = os.path.join(dst_save_path, dataset + '_data')
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = 'Ridge_'+key+'_Results' if not original else 'Ridge_Original_'+key+'_Results'
+    filename = 'Ridge_Results' if not original else 'Ridge_Original_Results'
     json.dump(eval_results, open(os.path.join(dest_path, filename),'w'))
-    filename = 'Ridge_'+key+'_nd_Results' if not original else 'Ridge_Original_'+key+'_nd_Results'
+    filename = 'Ridge_nd_Results' if not original else 'Ridge_Original_nd_Results'
     json.dump(nd_results, open(os.path.join(dest_path, filename),'w'))
 
 
 # Save the decoding accuracy of each model, only fulsang and jaulab datasets are valid as hugo_data doesn't present two competing stimuli
 def decode_attention(model:str, dataset:str, subjects:list, window_len:int, data_path:str, mdl_path:str, dst_save_path:str, 
-                     key:str, population = False, filt = True, filt_path = None):
+                    population = False, filt = True, filt_path = None):
 
     n_subjects, n_chan, batch_size, _ = get_params(dataset)
     accuracies = []
@@ -142,7 +142,7 @@ def decode_attention(model:str, dataset:str, subjects:list, window_len:int, data
         subjects = [subjects] 
     
 
-    print(f'Decoding {model} on {dataset} dataset with a window of {str(window_len/64)}')
+    print(f'Decoding {model} on {dataset} dataset with a window of {str(window_len//64)}s')
 
     for n, subj in enumerate(subjects):
 
@@ -151,14 +151,14 @@ def decode_attention(model:str, dataset:str, subjects:list, window_len:int, data
 
         # LOAD DATA
         test_set = get_Dataset(dataset, data_path, subj, train=False, acc=True, norm_stim=True, population=population, filt=filt, filt_path=filt_path)
-        test_loader = DataLoader(test_set, batch_size, shuffle=False, pin_memory=True)
+        test_loader = DataLoader(test_set, window_len, shuffle=False, pin_memory=True)
 
         attended_correct = 0
 
         if model == 'Ridge' or  model == 'Ridge_Original':
             
             # CARGA EL MODELO
-            mdl_folder_path = os.path.join(mdl_path, dataset + '_data', model+'_'+key)
+            mdl_folder_path = os.path.join(mdl_path, dataset + '_data', model)
             filename = get_filname(mdl_folder_path, subj)
             mdl = pickle.load(open(os.path.join(mdl_folder_path, filename), 'rb'))
 
@@ -179,7 +179,7 @@ def decode_attention(model:str, dataset:str, subjects:list, window_len:int, data
         else:
 
             # OBTAIN MODEL PATH
-            folder_path = os.path.join(mdl_path , dataset + '_data', model+'_'+key)
+            folder_path = os.path.join(mdl_path , dataset + '_data', model)
             filename = get_filname(folder_path, subj)
         
             model_path = os.path.join(folder_path, filename)
@@ -216,7 +216,7 @@ def decode_attention(model:str, dataset:str, subjects:list, window_len:int, data
     dest_path = dest_path = os.path.join(dst_save_path, dataset + '_data', model)
     if not os.path.exists(dest_path):
         os.makedirs(dest_path)
-    filename = key+'_'+str(window_len)+'_accuracies'
+    filename = str(window_len)+'_accuracies'
 
     json.dump(accuracies, open(os.path.join(dest_path, filename),'w'))
                 

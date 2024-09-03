@@ -34,7 +34,6 @@ def normalize(tensor: torch.tensor):
 # turn a tensor to 0 mean and std of 1 with shape (T)
 def normalize_stim(tensor: torch.tensor):
 
-    # unsqueeze necesario para el broadcasting (10) => (10, 1)
     mean = torch.mean(tensor)
     std = torch.std(tensor)
 
@@ -108,6 +107,7 @@ class FulsangDataset(Dataset):
             else:
                 window = torch.hstack([self.eeg[:, idx:idx+self.window] , self.eeg[:, 0:rest]])
                 return window, self.stima[idx]
+            
     def __len__(self):
         return self.samples * self.trials
     
@@ -181,7 +181,7 @@ class JaulabDataset(Dataset):
 
         # Concateno en un tensor global la información de los sujetos indicados
         self.eeg = torch.hstack(eeg)
-        self.stima = torch.cat(stima)
+        self.stima = torch.cat(stima) 
         self.stimb = torch.cat(stimb)
 
         self.trials = len_trial

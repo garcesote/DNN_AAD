@@ -99,7 +99,7 @@ def get_other_subjects(subject, dataset):
 # Returns the corresponding subject data in dataset
 def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=False, 
                 norm_stim=False, filt=False, filt_path=None, population = False):
-
+ 
     '''
     Input params:
         dataset: select dataset between 'fulsang', 'jaulab' or 'hugo
