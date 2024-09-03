@@ -16,6 +16,48 @@ else:
 
 def eval_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, dst_save_path:str, mdl_path:str, 
              accuracy=False, population = False, filt = False, filt_path = None):
+    
+    """Training parameters
+    
+    model: str
+        introduce the model between 'fcnn', 'cnn'
+    
+    dataset: str
+        introduce the name of the dataset between 'fulsang', 'jaulab', 'hugo'
+
+    subjects: list
+        list of subjects you want your network to be evaluated on
+
+    window_len: int
+        lenght of the window used for evaluating
+
+    data_path: str
+        path where the datasets are located
+
+    matrics_save_path: string
+        save path for the train and val loss
+    
+    mdl_save_path: string
+        save path for the trained model
+
+    max_epoch: int
+        maximun number of epoch during training
+
+    early_stoping_patience: int
+        number of waiting epoch before stop training because not improving loss
+
+    population: bool
+        select if you want to train on the subject specific mode or on the population where
+        the subject introduced is ignored and the network gets trained on the rest
+
+    filt: bool
+        select if you want your eeg signal to be filtered (useful only when selecting fulsang 
+        or jaulab data) 
+
+    filt_path: str
+        when filt==True the path from where eeg signals get selected
+    
+    """
 
     print('Evaluating '+model+' on '+dataset+' dataset')
 

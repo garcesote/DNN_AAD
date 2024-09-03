@@ -56,7 +56,7 @@ def get_params(dataset: str):
 
     return n_subjects, n_chan, batch_size, n_trials
 
-# Check wether the subject has 60 or 61 electrodes on Jaulab dataset
+# Check if the subject has 60 or 61 electrodes on Jaulab dataset
 def check_jaulab_chan(subj: str):
     subj_60_chan = ['S13', 'S16']
     return 60 if subj in subj_60_chan else 61
@@ -101,17 +101,27 @@ def get_Dataset(dataset:str, data_path:str, subjects: list, train = True, acc=Fa
                 norm_stim=False, filt=False, filt_path=None, population = False):
  
     '''
-    Input params:
-        dataset: select dataset between 'fulsang', 'jaulab' or 'hugo
-        data_path: path where the data from the subjects is located
-        subject: specify the subject or subjects from which get the data, eg: ['S1'] or ['S2' ... 'S18']
-        train: select whether you are getting val and train sets or the test set
-        acc: returns the dataset with the attended only or attended and unattended stim for decode the accuracy
-        norm_stim : normalize the stimulus of fulsang and jaulab dataset
-        file: select the filtered fulsang or jaulab data
-        filt_path: select the path of the filtered data
-        population: returns the sets from the population model where half of the trials for the excluded subject are used for test and val and
-                    the other subjects used for training, or the set for subject specific with 70%/15%/15% spliy on the specified subject
+    Input Parameters:
+    -------------
+        dataset: sting
+            select dataset between 'fulsang', 'jaulab' or 'hugo'
+        data_path: 
+            path where the data from the subjects is located
+        subject: 
+            specify the subject or subjects from which get the data, eg: ['S1'] or ['S2' ... 'S18']
+        train: 
+            select whether you are getting val and train sets or the test set
+        acc: 
+            returns the dataset with the attended only or attended and unattended stim for decode the accuracy
+        norm_stim : 
+            normalize the stimulus of fulsang and jaulab dataset
+        file: 
+            select the filtered fulsang or jaulab data
+        filt_path: 
+            select the path of the filtered data
+        population: 
+            returns the sets from the population model where half of the trials for the excluded subject are used for test and val and
+            the other subjects used for training, or the set for subject specific with 70%/15%/15% spliy on the specified subject
     '''
 
     if not isinstance(subjects, list):

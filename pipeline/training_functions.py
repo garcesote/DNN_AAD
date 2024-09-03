@@ -23,22 +23,65 @@ else:
 def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:str, metrics_save_path:str, mdl_save_path:str,
               max_epoch = 200, early_stopping_patience = 10, population = False, filt = False, filt_path = None):
     
+    """Training parameters
+    
+    model: str
+        introduce the model between 'fcnn', 'cnn'
+    
+    dataset:str
+        introduce the name of the dataset between 'fulsang', 'jaulab', 'hugo'
+
+    subjects: list
+        list of subjects you want your network to be trained on
+
+    window_len: int
+        lenght of the window used for training
+
+    data_path: str
+        path where the datasets are located
+
+    matrics_save_path: string
+        save path for the train and val loss
+    
+    mdl_save_path: string
+        save path for the trained model
+
+    max_epoch: int
+        maximun number of epoch during training
+
+    early_stoping_patience: int
+        number of waiting epoch before stop training because not improving loss
+
+    population: bool
+        select if you want to train on the subject specific mode or on the population where
+        the subject introduced is ignored and the network gets trained on the rest
+
+    filt: bool
+        select if you want your eeg signal to be filtered (useful only when selecting fulsang 
+        or jaulab data) 
+
+    filt_path: str
+        when filt==True the path from where eeg signals get selected
+    
+    """
     n_subjects, n_chan, batch_size, _ = get_params(dataset)
 
-    for n, subject in enumerate(subjects):
+    for subj in subjects:
 
         if population:
-            print(f'Training {model} with {dataset} data leaving out {subject}...')
+            print(f'Training {model} with {dataset} data leaving out {subj}...')
         else:
-            print(f'Training {model} with {dataset} data on {subject}...')
+            print(f'Training {model} with {dataset} data on {subj}...')
+
+        # With jaulab dataset number of electrodes depends on the subject
+        if dataset == 'jaulab':
+            n_chan = check_jaulab_chan(subj)
 
         # LOAD THE DATA
-        train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=filt, filt_path=filt_path, population=population)
+        train_set, val_set = get_Dataset(dataset, data_path, subj, train=True, norm_stim=True, filt=filt, filt_path=filt_path, population=population)
         train_loader, val_loader = DataLoader(train_set, window_len, shuffle=False, pin_memory=True),  DataLoader(val_set, batch_size, shuffle=False, pin_memory=True)
-
+        
         # LOAD THE MODEL
-        if dataset == 'jaulab':
-            n_chan = check_jaulab_chan(subject)
         if model == 'FCNN':
             mdl = FCNN(n_hidden = 3, dropout_rate=0.45, n_chan=n_chan)
             optimizer = torch.optim.NAdam(mdl.parameters(), lr=1e-6, weight_decay = 1e-4)
@@ -111,7 +154,7 @@ def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:s
             os.makedirs(mdl_folder)
         torch.save(
             best_state_dict, 
-            os.path.join(mdl_folder, subject+'_'+f'_epoch={epoch}_acc={mean_accuracy:.4f}.ckpt')
+            os.path.join(mdl_folder, subj+'_'+f'_epoch={epoch}_acc={mean_accuracy:.4f}.ckpt')
         )
 
         # save corresponding metrics
@@ -122,8 +165,8 @@ def train_dnn(model:str, dataset:str, subjects:list, window_len:int, data_path:s
         train_folder = os.path.join(metrics_save_path, dataset + '_data', 'train', model)
         if not os.path.exists(train_folder):
             os.makedirs(train_folder)
-        json.dump(train_loss, open(os.path.join(train_folder, subject+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
-        json.dump(val_loss, open(os.path.join(val_folder, subject+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
+        json.dump(train_loss, open(os.path.join(train_folder, subj+'_train_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
+        json.dump(val_loss, open(os.path.join(val_folder, subj+'_val_loss'+f'_epoch={epoch}_acc={mean_accuracy:.4f}'),'w'))
            
 
 def train_ridge(dataset:str, subjects:list, data_path:str, mdl_save_path:str, start_lag=0, end_lag=50, original=False, 

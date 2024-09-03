@@ -34,14 +34,14 @@ ds_subjects = {'hugo_subj' : ['S'+str(n) for n in range(1, 10)],
 }
 
 # TRAIN DNN
-# for dataset in datasets:
-#     for model in models:
-#         data_path = paths[dataset+'_path']
-#         filt_path= paths[dataset+'_filt_path'] if dataset != 'hugo' else None
-#         # Select if you want to select the filtered data
-#         filt = False if dataset == 'hugo' else True
-#         train_dnn(model=model, dataset=dataset, subjects=ds_subjects[dataset+'_subj'], data_path=data_path, key=date, mdl_save_path=mdl_save_path,
-#                   metrics_save_path=metrics_save_path, max_epoch=200, population = True, filt = filt, filt_path=filt_path)
+for dataset in datasets:
+    for model in models:
+        data_path = paths[dataset+'_path']
+        filt_path= paths[dataset+'_filt_path'] if dataset != 'hugo' else None
+        # Select if you want to select the filtered data
+        filt = False if dataset == 'hugo' else True
+        train_dnn(model=model, dataset=dataset, subjects=ds_subjects[dataset+'_subj'], data_path=data_path, key=date, mdl_save_path=mdl_save_path,
+                  metrics_save_path=metrics_save_path, max_epoch=200, population = True, filt = filt, filt_path=filt_path)
 
 # EVALUATE DNN
 for dataset in datasets:
@@ -53,19 +53,11 @@ for dataset in datasets:
         eval_dnn(model, dataset, ds_subjects[dataset+'_subj'], data_path, results_save_path, mdl_save_path, date , population=True, 
                  filt = filt, filt_path=filt_path)
 
-# # TRAINIG RIDGE
-# for dataset in datasets:
-#     data_path = paths[dataset+'_path']
-#     train_ridge(dataset, subject, data_path, mdl_save_path=mdl_save_path, key=date, original=True, filt_path=paths[dataset+'_filt_path'])
-#     eval_ridge(dataset, subject, data_path, mdl_save_path, key= date, dst_save_path= results_save_path, original=True, filt_path=paths[dataset+'_filt_path'])
-#     train_ridge(dataset, subject, data_path, mdl_save_path=mdl_save_path, key=date, original=False, filt_path=paths[dataset+'_filt_path'])
-#     eval_ridge(dataset, subject, data_path, mdl_save_path, key= date, dst_save_path= results_save_path, original=False, filt_path=paths[dataset+'_filt_path']) 
-
 # DECODING ACCURACY
-# window_lenghts = [128, 640, 1600, 3200]
-# models = ['CNN','FCNN']
-# datasets = ['jaulab', 'fulsang']
-# for dataset in datasets:
-#     for model in models:
-#         for win in window_lenghts:
-#             decode_attention(model, dataset, ds_subjects[dataset+'_subj'], win, paths[dataset+'_path'], mdl_save_path, accuracies_save_path, key=date, population=True, filt=True, filt_path=paths[dataset+'_filt_path'])
+window_lenghts = [128, 640, 1600, 3200]
+models = ['CNN','FCNN']
+datasets = ['jaulab', 'fulsang']
+for dataset in datasets:
+    for model in models:
+        for win in window_lenghts:
+            decode_attention(model, dataset, ds_subjects[dataset+'_subj'], win, paths[dataset+'_path'], mdl_save_path, accuracies_save_path, key=date, population=True, filt=True, filt_path=paths[dataset+'_filt_path'])
