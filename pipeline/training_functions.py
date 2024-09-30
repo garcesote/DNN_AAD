@@ -4,6 +4,7 @@ from utils.functional import correlation, get_params, check_jaulab_chan, get_Dat
 from utils.dnn import FCNN, CNN
 from utils.ridge import Ridge
 from utils.datasets import JaulabDatasetWindows, FulsangDatasetWindows
+from utils.custom_dataset import CustomDataset
 from torch.utils.data import DataLoader
 import torch.nn as nn
 import numpy as np
@@ -179,7 +180,8 @@ def train_ridge(dataset:str, subjects:list, data_path:str, mdl_save_path:str, st
         
         mdl = Ridge(start_lag=start_lag, end_lag=end_lag, alpha=alphas, original=original)
         
-        train_set, val_set = get_Dataset(dataset, data_path, subject, train=True, norm_stim=True, filt=filt, filt_path=filt_path)
+        train_set = CustomDataset(dataset, data_path, 'train', subject, window=128, hop=128//4, population=False)
+        val_set = CustomDataset(dataset, data_path, 'val', subject, window=128, hop=128//4, population=False)
         
         if dataset == 'fulsang' or dataset == 'jaulab':
             train_eeg, train_stim = train_set.eeg, train_set.stima 

@@ -26,7 +26,7 @@ ds_subjects = {'hugo_subj' : ['S'+str(n) for n in range(1, 13)],
 }
 
 models = ['FCNN', 'CNN']
-datasets = ['hugo','fulsang','jaulab']
+datasets = ['fulsang','jaulab']
 
 # Select the date for saving models and metrics
 key = '09_08_win_'+str(window//64)+'s'
@@ -37,40 +37,40 @@ results_save_path = 'ResultsWindows/'+key+'/eval_metrics'
 accuracies_save_path = 'ResultsWindows/'+key+'/decode_accuracy'
 
 # TRAIN DNN
-for model in models:
-    for dataset in datasets:
-        data_path = paths[dataset+'_path']
-        window = window * 2 if dataset == 'hugo' else window
-        filt_path = None if dataset=='hugo' else paths[dataset+'_filt_path']
-        train_dnn(model=model, dataset=dataset, subjects=ds_subjects[dataset+'_subj'], window_len=window, data_path=data_path, mdl_save_path=mdl_save_path,
-                    metrics_save_path=metrics_save_path, max_epoch=200, filt=True, filt_path=filt_path)
-# EVALUATE DNN
-for model in models:
-    for dataset in datasets:
-        data_path = paths[dataset+'_path']
-        window = window * 2 if dataset == 'hugo' else window
-        filt_path = None if dataset=='hugo' else paths[dataset+'_filt_path']
-        eval_dnn(model, dataset, ds_subjects[dataset+'_subj'], window, data_path, results_save_path, mdl_save_path, 
-                filt=True, filt_path=filt_path)
+# for model in models:
+#     for dataset in datasets:
+#         data_path = paths[dataset+'_path']
+#         window = window * 2 if dataset == 'hugo' else window
+#         filt_path = None if dataset=='hugo' else paths[dataset+'_filt_path']
+#         train_dnn(model=model, dataset=dataset, subjects=ds_subjects[dataset+'_subj'], window_len=window, data_path=data_path, mdl_save_path=mdl_save_path,
+#                     metrics_save_path=metrics_save_path, max_epoch=200, filt=True, filt_path=filt_path)
+# # EVALUATE DNN
+# for model in models:
+#     for dataset in datasets:
+#         data_path = paths[dataset+'_path']
+#         window = window * 2 if dataset == 'hugo' else window
+#         filt_path = None if dataset=='hugo' else paths[dataset+'_filt_path']
+#         eval_dnn(model, dataset, ds_subjects[dataset+'_subj'], window, data_path, results_save_path, mdl_save_path, 
+#                 filt=True, filt_path=filt_path)
 
 # LINEAR MODEL: RIDGE
 for dataset in datasets:
     data_path = paths[dataset+'_path']
     window = window * 2 if dataset == 'hugo' else window
     filt_path = None if dataset=='hugo' else paths[dataset+'_filt_path']
-    train_ridge(dataset, ds_subjects[dataset+'_subj'], data_path, mdl_save_path=mdl_save_path, original=True, 
+    train_ridge(dataset, ds_subjects[dataset+'_subj'], data_path, mdl_save_path=mdl_save_path, original=False, 
                 filt=True, filt_path=filt_path)
-    eval_ridge(dataset, ds_subjects[dataset+'_subj'], window, data_path, mdl_save_path, dst_save_path= results_save_path, original=True, 
+    eval_ridge(dataset, ds_subjects[dataset+'_subj'], window, data_path, mdl_save_path, dst_save_path= results_save_path, original=False, 
             filt=True, filt_path=filt_path)
 
 # DECODING ACCURACY
-window_lenghts = [128, 640, 1600, 3200]
-models = ['CNN','FCNN','Ridge','Ridge_Original']
-datasets = ['jaulab', 'fulsang']
-for dataset in datasets:
-    for model in models:
-        for win in window_lenghts:
-            decode_attention(model, dataset, ds_subjects[dataset+'_subj'], win, paths[dataset+'_path'], mdl_save_path, 
-                            accuracies_save_path, filt_path=paths[dataset+'_filt_path'])
+# window_lenghts = [128, 640, 1600, 3200]
+# models = ['CNN','FCNN','Ridge','Ridge_Original']
+# datasets = ['jaulab', 'fulsang']
+# for dataset in datasets:
+#     for model in models:
+#         for win in window_lenghts:
+#             decode_attention(model, dataset, ds_subjects[dataset+'_subj'], win, paths[dataset+'_path'], mdl_save_path, 
+#                             accuracies_save_path, filt_path=paths[dataset+'_filt_path'])
 
 # leave_one_out_ridge(dataset='fulsang', datapath=paths['fulsang_path'], window = 50, original=True, subject='S12', save_path='x')
