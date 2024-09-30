@@ -47,7 +47,7 @@ class FCNN(nn.Module):
 
 class CNN(nn.Module):
 
-    def __init__(self, F1=8, D=8, F2=64, AP1 = 2, AP2 = 5, dropout = 0.2, input_channels=64, input_samples=50):
+    def __init__(self, F1=8, D=8, F2=64, AP1 = 2, AP2 = 4, dropout = 0.2, input_channels=64, input_samples=50):
 
         super().__init__()
         self.F1 = F1
